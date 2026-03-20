@@ -26,8 +26,11 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
+      // Initialize access control in background -- don't block actor creation
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
-      await actor._initializeAccessControlWithSecret(adminToken);
+      actor._initializeAccessControlWithSecret(adminToken).catch(() => {
+        // Ignore errors -- actor still works without this
+      });
       return actor;
     },
     // Only refetch when identity changes
