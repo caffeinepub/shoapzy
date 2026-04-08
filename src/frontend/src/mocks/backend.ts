@@ -132,4 +132,18 @@ export const mockBackend: backendInterface = {
   getProductVariants: async () => [],
   addProductVariant: async () => ({ __kind__: "ok" as const, ok: null }),
   updateProductVariants: async () => ({ __kind__: "ok" as const, ok: null }),
+  // Batch 5: Address Book
+  getSavedAddresses: async () => [],
+  addSavedAddress: async () => ({ __kind__: "ok" as const, ok: null }),
+  updateSavedAddress: async () => ({ __kind__: "ok" as const, ok: null }),
+  deleteSavedAddress: async () => ({ __kind__: "ok" as const, ok: null }),
+  // Batch 5: Referral
+  getReferralCode: async () => "SHZ-DEMO1",
+  getReferralStats: async () => ({
+    referralCode: "SHZ-DEMO1",
+    totalReferrals: BigInt(0),
+    successfulReferrals: BigInt(0),
+    bonusPointsEarned: BigInt(0),
+  }),
+  applyReferralCode: async () => ({ __kind__: "ok" as const, ok: null }),
 };

@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeftRight,
+  BookMarked,
   ChevronDown,
+  Gift,
   Heart,
   LayoutDashboard,
   LogOut,
@@ -14,6 +17,7 @@ import {
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
+import { useCompare } from "../hooks/useCompare";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { UserRole } from "../types";
 
@@ -39,6 +43,8 @@ export default function Navbar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
 
+  const { compareCount } = useCompare();
+
   const { data: cart } = useQuery({
     queryKey: ["cart", identity?.getPrincipal().toString()],
     queryFn: () => actor!.getCallerCart(),
@@ -59,8 +65,8 @@ export default function Navbar() {
 
   const cartCount =
     cart?.reduce((sum, item) => sum + Number(item.quantity), 0) ?? 0;
-
   const wishlistCount = wishlistIds.length;
+  const isAdmin = role === UserRole.admin;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +74,6 @@ export default function Navbar() {
       navigate(`/?search=${encodeURIComponent(search.trim())}`);
     }
   };
-
-  const isAdmin = role === UserRole.admin;
 
   return (
     <nav className="sticky top-0 z-50 shadow-md" data-ocid="navbar">
@@ -175,6 +179,27 @@ export default function Navbar() {
                 Become a Seller
               </Link>
 
+              {/* Compare link with badge */}
+              <Link
+                to="/compare"
+                className="relative flex items-center gap-1.5 px-2 py-1.5 text-sm font-semibold text-white hover:text-yellow-200 transition-colors"
+                data-ocid="nav-compare"
+                aria-label="Compare products"
+              >
+                <span className="relative">
+                  <ArrowLeftRight className="w-5 h-5" />
+                  {compareCount > 0 && (
+                    <span
+                      className="absolute -top-2 -right-2 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none"
+                      style={{ background: "#fb641b", color: "#fff" }}
+                      data-ocid="nav-compare-badge"
+                    >
+                      {compareCount}
+                    </span>
+                  )}
+                </span>
+              </Link>
+
               {/* Account Dropdown */}
               <div className="relative">
                 <button
@@ -191,7 +216,7 @@ export default function Navbar() {
 
                 {accountOpen && (
                   <div
-                    className="absolute right-0 top-full mt-1 w-52 bg-white rounded shadow-lg border border-gray-100 py-1 z-50"
+                    className="absolute right-0 top-full mt-1 w-56 bg-white rounded shadow-lg border border-gray-100 py-1 z-50"
                     data-ocid="nav-account-dropdown"
                   >
                     {identity ? (
@@ -221,6 +246,24 @@ export default function Navbar() {
                               {wishlistCount}
                             </span>
                           )}
+                        </Link>
+                        <Link
+                          to="/saved-addresses"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          data-ocid="nav-saved-addresses"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          <BookMarked className="w-4 h-4 text-blue-600" />
+                          Saved Addresses
+                        </Link>
+                        <Link
+                          to="/referral"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          data-ocid="nav-referral"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          <Gift className="w-4 h-4 text-purple-500" />
+                          Refer &amp; Earn
                         </Link>
                         <Link
                           to="/seller/dashboard"
@@ -402,6 +445,38 @@ export default function Navbar() {
                       {wishlistCount}
                     </span>
                   )}
+                </Link>
+                <Link
+                  to="/compare"
+                  className="flex items-center gap-2 py-2.5 text-sm text-white hover:text-yellow-200 transition-colors"
+                  data-ocid="nav-mobile-compare"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <ArrowLeftRight className="w-4 h-4" /> Compare
+                  {compareCount > 0 && (
+                    <span
+                      className="ml-1 text-xs font-bold rounded-full px-1.5 py-0.5"
+                      style={{ background: "#fb641b" }}
+                    >
+                      {compareCount}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  to="/saved-addresses"
+                  className="flex items-center gap-2 py-2.5 text-sm text-white hover:text-yellow-200 transition-colors"
+                  data-ocid="nav-mobile-saved-addresses"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <BookMarked className="w-4 h-4" /> Saved Addresses
+                </Link>
+                <Link
+                  to="/referral"
+                  className="flex items-center gap-2 py-2.5 text-sm text-white hover:text-yellow-200 transition-colors"
+                  data-ocid="nav-mobile-referral"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Gift className="w-4 h-4" /> Refer &amp; Earn
                 </Link>
                 <Link
                   to="/seller/dashboard"

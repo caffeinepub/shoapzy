@@ -41,6 +41,21 @@ export const Product = IDL.Record({
   'image' : ExternalBlob,
   'price' : IDL.Nat,
 });
+export const AddressLabel = IDL.Variant({
+  'other' : IDL.Null,
+  'home' : IDL.Null,
+  'office' : IDL.Null,
+});
+export const SavedAddress = IDL.Record({
+  'id' : IDL.Text,
+  'tag' : AddressLabel,
+  'street' : IDL.Text,
+  'city' : IDL.Text,
+  'name' : IDL.Text,
+  'state' : IDL.Text,
+  'phone' : IDL.Text,
+  'pincode' : IDL.Text,
+});
 export const CartItem = IDL.Record({
   'productId' : IDL.Text,
   'seller' : IDL.Principal,
@@ -129,6 +144,12 @@ export const Review = IDL.Record({
   'timestamp' : IDL.Int,
   'rating' : IDL.Nat,
   'buyerName' : IDL.Text,
+});
+export const ReferralStats = IDL.Record({
+  'bonusPointsEarned' : IDL.Nat,
+  'referralCode' : IDL.Text,
+  'successfulReferrals' : IDL.Nat,
+  'totalReferrals' : IDL.Nat,
 });
 export const ReviewSummary = IDL.Record({
   'productId' : IDL.Text,
@@ -225,9 +246,19 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
       [],
     ),
+  'addSavedAddress' : IDL.Func(
+      [SavedAddress],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'addToCart' : IDL.Func([CartItem], [], []),
   'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'applyCoupon' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'applyReferralCode' : IDL.Func(
       [IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
@@ -258,6 +289,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'deleteProduct' : IDL.Func([IDL.Text], [], []),
+  'deleteSavedAddress' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'getAllActiveCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
@@ -300,12 +336,15 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+  'getReferralCode' : IDL.Func([], [IDL.Text], []),
+  'getReferralStats' : IDL.Func([], [ReferralStats], ['query']),
   'getReturnRequestByOrder' : IDL.Func(
       [IDL.Text],
       [IDL.Opt(ReturnRequest)],
       ['query'],
     ),
   'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
+  'getSavedAddresses' : IDL.Func([], [IDL.Vec(SavedAddress)], ['query']),
   'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
   'getSellerProducts' : IDL.Func(
       [IDL.Principal],
@@ -365,6 +404,11 @@ export const idlService = IDL.Service({
   'updateProduct' : IDL.Func([Product], [], []),
   'updateProductVariants' : IDL.Func(
       [IDL.Text, IDL.Vec(ProductVariant)],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'updateSavedAddress' : IDL.Func(
+      [SavedAddress],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
@@ -428,6 +472,21 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'image' : ExternalBlob,
     'price' : IDL.Nat,
+  });
+  const AddressLabel = IDL.Variant({
+    'other' : IDL.Null,
+    'home' : IDL.Null,
+    'office' : IDL.Null,
+  });
+  const SavedAddress = IDL.Record({
+    'id' : IDL.Text,
+    'tag' : AddressLabel,
+    'street' : IDL.Text,
+    'city' : IDL.Text,
+    'name' : IDL.Text,
+    'state' : IDL.Text,
+    'phone' : IDL.Text,
+    'pincode' : IDL.Text,
   });
   const CartItem = IDL.Record({
     'productId' : IDL.Text,
@@ -517,6 +576,12 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'rating' : IDL.Nat,
     'buyerName' : IDL.Text,
+  });
+  const ReferralStats = IDL.Record({
+    'bonusPointsEarned' : IDL.Nat,
+    'referralCode' : IDL.Text,
+    'successfulReferrals' : IDL.Nat,
+    'totalReferrals' : IDL.Nat,
   });
   const ReviewSummary = IDL.Record({
     'productId' : IDL.Text,
@@ -610,9 +675,19 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
         [],
       ),
+    'addSavedAddress' : IDL.Func(
+        [SavedAddress],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'addToCart' : IDL.Func([CartItem], [], []),
     'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'applyCoupon' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'applyReferralCode' : IDL.Func(
         [IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
@@ -643,6 +718,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'deleteProduct' : IDL.Func([IDL.Text], [], []),
+    'deleteSavedAddress' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'getAllActiveCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
@@ -685,12 +765,15 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+    'getReferralCode' : IDL.Func([], [IDL.Text], []),
+    'getReferralStats' : IDL.Func([], [ReferralStats], ['query']),
     'getReturnRequestByOrder' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(ReturnRequest)],
         ['query'],
       ),
     'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
+    'getSavedAddresses' : IDL.Func([], [IDL.Vec(SavedAddress)], ['query']),
     'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
     'getSellerProducts' : IDL.Func(
         [IDL.Principal],
@@ -754,6 +837,11 @@ export const idlFactory = ({ IDL }) => {
     'updateProduct' : IDL.Func([Product], [], []),
     'updateProductVariants' : IDL.Func(
         [IDL.Text, IDL.Vec(ProductVariant)],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'updateSavedAddress' : IDL.Func(
+        [SavedAddress],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),

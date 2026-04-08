@@ -95,6 +95,17 @@ type SellerInfo =
    shopName: text;
    status: text;
  };
+type SavedAddress = 
+ record {
+   city: text;
+   id: text;
+   name: text;
+   phone: text;
+   pincode: text;
+   state: text;
+   street: text;
+   tag: AddressLabel;
+ };
 type ReviewSummary = 
  record {
    averageRating: float64;
@@ -126,6 +137,13 @@ type ReturnRequest =
    reason: text;
    status: ReturnStatus;
    timestamp: int;
+ };
+type ReferralStats = 
+ record {
+   bonusPointsEarned: nat;
+   referralCode: text;
+   successfulReferrals: nat;
+   totalReferrals: nat;
  };
 type RedeemResult = 
  variant {
@@ -208,6 +226,12 @@ type ApprovalStatus =
    pending;
    rejected;
  };
+type AddressLabel = 
+ variant {
+   home;
+   office;
+   other;
+ };
 service : {
   _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
   _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
@@ -230,12 +254,20 @@ service : {
       err: text;
       ok: text;
     });
+  addSavedAddress: (address: SavedAddress) -> (variant {
+                                                 err: text;
+                                                 ok;
+                                               });
   addToCart: (item: CartItem) -> ();
   addToWishlist: (productId: text) -> (bool);
   applyCoupon: (code: text) -> (variant {
                                   err: text;
                                   ok;
                                 });
+  applyReferralCode: (code: text) -> (variant {
+                                        err: text;
+                                        ok;
+                                      });
   approveReturn: (requestId: text, adminComment: opt text) ->
    (variant {
       err: text;
@@ -258,6 +290,10 @@ service : {
                                        ok;
                                      });
   deleteProduct: (productId: text) -> ();
+  deleteSavedAddress: (addressId: text) -> (variant {
+                                              err: text;
+                                              ok;
+                                            });
   getAllActiveCoupons: () -> (vec CouponPublic) query;
   getAllOrders: () -> (vec Order) query;
   getAllReturnRequests: () -> (vec ReturnRequest) query;
@@ -285,8 +321,11 @@ service : {
   getProductReviews: (productId: text) -> (vec Review) query;
   getProductVariants: (productId: text) -> (vec ProductVariant) query;
   getProducts: () -> (vec Product) query;
+  getReferralCode: () -> (text);
+  getReferralStats: () -> (ReferralStats) query;
   getReturnRequestByOrder: (orderId: text) -> (opt ReturnRequest) query;
   getReviewSummaries: () -> (vec ReviewSummary) query;
+  getSavedAddresses: () -> (vec SavedAddress) query;
   getSellerOrders: (seller: principal) -> (vec Order) query;
   getSellerProducts: (seller: principal) -> (vec Product) query;
   getSellerProfileData: (seller: principal) -> (opt SellerProfileData) query;
@@ -330,6 +369,10 @@ service : {
       err: text;
       ok;
     });
+  updateSavedAddress: (address: SavedAddress) -> (variant {
+                                                    err: text;
+                                                    ok;
+                                                  });
   updateSellerOrderStatus: (orderId: text, newStatus:
    variant {
      approved;

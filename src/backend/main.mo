@@ -4,6 +4,7 @@ import OutCall "mo:caffeineai-http-outcalls/outcall";
 import UserApproval "mo:caffeineai-user-approval/approval";
 import Storage "mo:caffeineai-object-storage/Storage";
 import Map "mo:core/Map";
+import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Time "mo:core/Time";
@@ -20,9 +21,12 @@ import VariantTypes "types/variants";
 import VariantsApi "mixins/variants-api";
 import LoyaltyApi "mixins/loyalty-api";
 import LoyaltyLib "lib/loyalty";
-import Migration "migration";
+import AddressBookApi "mixins/address-book-api";
+import AddressBookLib "lib/address-book";
+import ReferralApi "mixins/referral-api";
 
-(with migration = Migration.run)
+
+
 actor {
   // Record seller registration
   public type SellerRegistration = {
@@ -152,6 +156,14 @@ actor {
   // Loyalty points: keyed by Principal, value is points balance
   let loyaltyPoints = Map.empty<Principal, Nat>();
 
+  // Address book: keyed by Principal, value is list of saved addresses
+  let addressBook : AddressBookLib.AddressMap = Map.empty();
+
+  // Referral: owner->code, code->owner, referrer->list of referred
+  let referralOwnerCode = Map.empty<Principal, Text>();
+  let referralCodeOwner = Map.empty<Text, Principal>();
+  let referralReferred = Map.empty<Principal, List.List<Principal>>();
+
   include MixinObjectStorage();
   include MixinAuthorization(accessControlState);
   include ReturnsMixin(returnRequests, accessControlState, orders);
@@ -159,6 +171,8 @@ actor {
   include CouponsApi(coupons, accessControlState);
   include VariantsApi(products, accessControlState);
   include LoyaltyApi(loyaltyPoints);
+  include AddressBookApi(addressBook);
+  include ReferralApi(referralOwnerCode, referralCodeOwner, referralReferred, loyaltyPoints);
 
   // Helper: get seller status as text
   func getSellerStatus(principal : Principal) : Text {

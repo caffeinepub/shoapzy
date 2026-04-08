@@ -1,6 +1,7 @@
-import { Heart, ShoppingCart, Zap } from "lucide-react";
+import { BarChart2, Heart, ShoppingCart, Zap } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
+import { useCompare } from "../hooks/useCompare";
 import type { Product, ReviewSummary } from "../types";
 
 const STATIC_RATINGS: Record<number, { stars: number; count: string }> = {};
@@ -39,6 +40,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const navigate = useNavigate();
   const { actor } = useActor();
+  const { addToCompare, removeFromCompare, isInCompare, canAdd } = useCompare();
   const seed = product.title.charCodeAt(0) + product.title.length;
   const staticRating = getRating(seed);
   const mrp = Number(product.mrp) / 100;
@@ -47,6 +49,7 @@ export function ProductCard({
   const hasDiscount = mrp > price && discount > 0;
   const isWishlisted = wishlistIds.includes(product.id);
   const isTogglingThis = togglingWishlistId === product.id;
+  const inCompare = isInCompare(product.id);
 
   // Live rating or fallback to static
   const ratingDisplay = reviewSummary
@@ -67,6 +70,16 @@ export function ProductCard({
       return;
     }
     onToggleWishlist?.(product);
+  };
+
+  const handleCompareClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inCompare) {
+      removeFromCompare(product.id);
+    } else if (canAdd) {
+      addToCompare(product);
+    }
   };
 
   const handleBuyNow = async (e: React.MouseEvent) => {
@@ -96,26 +109,60 @@ export function ProductCard({
       data-ocid="product-card"
       className="bg-white flex flex-col hover:shadow-md transition-all duration-200 cursor-pointer relative"
     >
-      {/* Wishlist heart button */}
-      <button
-        type="button"
-        data-ocid="wishlist-btn"
-        aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-        onClick={handleWishlistClick}
-        className={`absolute top-2 right-2 z-10 w-7 h-7 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
-          isLoggedIn ? "bg-white hover:scale-110" : "bg-white/70 cursor-pointer"
-        } ${isTogglingThis ? "opacity-50" : ""}`}
-      >
-        <Heart
-          className={`w-4 h-4 transition-colors duration-200 ${
-            isWishlisted && isLoggedIn
-              ? "fill-red-500 text-red-500"
-              : isLoggedIn
-                ? "text-muted-foreground hover:text-red-400"
-                : "text-muted-foreground/40"
+      {/* Top-right action buttons: wishlist + compare */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+        {/* Wishlist */}
+        <button
+          type="button"
+          data-ocid="wishlist-btn"
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          onClick={handleWishlistClick}
+          className={`w-7 h-7 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
+            isLoggedIn
+              ? "bg-white hover:scale-110"
+              : "bg-white/70 cursor-pointer"
+          } ${isTogglingThis ? "opacity-50" : ""}`}
+        >
+          <Heart
+            className={`w-4 h-4 transition-colors duration-200 ${
+              isWishlisted && isLoggedIn
+                ? "fill-red-500 text-red-500"
+                : isLoggedIn
+                  ? "text-muted-foreground hover:text-red-400"
+                  : "text-muted-foreground/40"
+            }`}
+          />
+        </button>
+
+        {/* Compare */}
+        <button
+          type="button"
+          data-ocid="compare-btn"
+          aria-label={inCompare ? "Remove from compare" : "Add to compare"}
+          onClick={handleCompareClick}
+          disabled={!inCompare && !canAdd}
+          title={
+            inCompare
+              ? "Remove from compare"
+              : canAdd
+                ? "Compare this product"
+                : "Compare list is full (max 4)"
+          }
+          className={`w-7 h-7 rounded-full flex items-center justify-center shadow-sm transition-all duration-200 ${
+            inCompare
+              ? "bg-[#2874f0] scale-110"
+              : canAdd
+                ? "bg-white hover:scale-110"
+                : "bg-white/50 cursor-not-allowed opacity-50"
           }`}
-        />
-      </button>
+        >
+          <BarChart2
+            className={`w-4 h-4 transition-colors duration-200 ${
+              inCompare ? "text-white" : "text-muted-foreground"
+            }`}
+          />
+        </button>
+      </div>
 
       <Link to={`/product/${product.id}`} className="block">
         <div className="aspect-square overflow-hidden flex items-center justify-center p-3 bg-[#f9f9f9]">

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
@@ -17,6 +18,25 @@ import SellerRegister from "./pages/SellerRegister";
 import SetupAdmin from "./pages/SetupAdmin";
 import Wishlist from "./pages/Wishlist";
 import { UserRole } from "./types";
+
+// Batch 5 pages — lazy loaded
+const SavedAddresses = lazy(() => import("./pages/SavedAddresses"));
+const Compare = lazy(() => import("./pages/Compare"));
+const Referral = lazy(() => import("./pages/Referral"));
+
+function PageLoader() {
+  return (
+    <div
+      className="min-h-[60vh] flex items-center justify-center"
+      style={{ background: "#f1f3f6" }}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function AppRoutes() {
   const { identity } = useInternetIdentity();
@@ -75,6 +95,40 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route path="/seller/:principalId" element={<SellerProfile />} />
+
+          {/* Batch 5 routes */}
+          <Route
+            path="/saved-addresses"
+            element={
+              isLoggedIn ? (
+                <Suspense fallback={<PageLoader />}>
+                  <SavedAddresses />
+                </Suspense>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <Compare />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/referral"
+            element={
+              isLoggedIn ? (
+                <Suspense fallback={<PageLoader />}>
+                  <Referral />
+                </Suspense>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
         </Routes>
       </main>
       <Footer />

@@ -10,6 +10,9 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export type AddressLabel = { 'other' : null } |
+  { 'home' : null } |
+  { 'office' : null };
 export type ApprovalStatus = { 'pending' : null } |
   { 'approved' : null } |
   { 'rejected' : null };
@@ -74,6 +77,12 @@ export type RedeemResult = {
     'ok' : { 'discountAmount' : bigint, 'pointsUsed' : bigint }
   } |
   { 'err' : string };
+export interface ReferralStats {
+  'bonusPointsEarned' : bigint,
+  'referralCode' : string,
+  'successfulReferrals' : bigint,
+  'totalReferrals' : bigint,
+}
 export interface ReturnRequest {
   'id' : string,
   'status' : ReturnStatus,
@@ -99,6 +108,16 @@ export interface ReviewSummary {
   'productId' : string,
   'averageRating' : number,
   'reviewCount' : bigint,
+}
+export interface SavedAddress {
+  'id' : string,
+  'tag' : AddressLabel,
+  'street' : string,
+  'city' : string,
+  'name' : string,
+  'state' : string,
+  'phone' : string,
+  'pincode' : string,
 }
 export interface SellerInfo {
   'status' : string,
@@ -205,9 +224,19 @@ export interface _SERVICE {
     { 'ok' : string } |
       { 'err' : string }
   >,
+  'addSavedAddress' : ActorMethod<
+    [SavedAddress],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'addToCart' : ActorMethod<[CartItem], undefined>,
   'addToWishlist' : ActorMethod<[string], boolean>,
   'applyCoupon' : ActorMethod<[string], { 'ok' : null } | { 'err' : string }>,
+  'applyReferralCode' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'approveReturn' : ActorMethod<
     [string, [] | [string]],
     { 'ok' : null } |
@@ -233,6 +262,11 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'deleteProduct' : ActorMethod<[string], undefined>,
+  'deleteSavedAddress' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'getAllActiveCoupons' : ActorMethod<[], Array<CouponPublic>>,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
   'getAllReturnRequests' : ActorMethod<[], Array<ReturnRequest>>,
@@ -260,8 +294,11 @@ export interface _SERVICE {
   'getProductReviews' : ActorMethod<[string], Array<Review>>,
   'getProductVariants' : ActorMethod<[string], Array<ProductVariant>>,
   'getProducts' : ActorMethod<[], Array<Product>>,
+  'getReferralCode' : ActorMethod<[], string>,
+  'getReferralStats' : ActorMethod<[], ReferralStats>,
   'getReturnRequestByOrder' : ActorMethod<[string], [] | [ReturnRequest]>,
   'getReviewSummaries' : ActorMethod<[], Array<ReviewSummary>>,
+  'getSavedAddresses' : ActorMethod<[], Array<SavedAddress>>,
   'getSellerOrders' : ActorMethod<[Principal], Array<Order>>,
   'getSellerProducts' : ActorMethod<[Principal], Array<Product>>,
   'getSellerProfileData' : ActorMethod<[Principal], [] | [SellerProfileData]>,
@@ -301,6 +338,11 @@ export interface _SERVICE {
   'updateProduct' : ActorMethod<[Product], undefined>,
   'updateProductVariants' : ActorMethod<
     [string, Array<ProductVariant>],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'updateSavedAddress' : ActorMethod<
+    [SavedAddress],
     { 'ok' : null } |
       { 'err' : string }
   >,

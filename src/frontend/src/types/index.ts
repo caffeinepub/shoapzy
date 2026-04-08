@@ -120,3 +120,25 @@ export interface ProductVariant {
   stock: bigint;
   price: number | null;
 }
+
+// Batch 5 types
+
+export type SavedAddressLabel = "home" | "office" | "other";
+
+export interface SavedAddress {
+  id: string;
+  label: SavedAddressLabel;
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface ReferralStats {
+  referralCode: string;
+  totalReferrals: bigint;
+  successfulReferrals: bigint;
+  bonusPointsEarned: bigint;
+}

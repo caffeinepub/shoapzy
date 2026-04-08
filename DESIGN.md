@@ -32,6 +32,9 @@
 | Hero | Accent orange gradient | None | None | Flash sale, countdown, promo banner |
 | Product Grid | Muted light grey | Subtle | Card | Main content area |
 | Product Card | White | Muted border | Card elevation | Product display with image, price, rating |
+| Address Card | White | Muted border | Card elevation | Saved address with label badge, edit/delete actions |
+| Comparison Grid | Muted light grey | Subtle | Card | 1–4 product cards side-by-side for attribute comparison |
+| Referral Section | Card white | Primary border | Elevated | Code display box, share buttons, stats grid |
 | Footer | Primary blue | Top border | None | Company info, links |
 | Modal | Card white | Primary border | Elevated | Checkout, confirmation dialogs |
 
@@ -40,8 +43,11 @@
 - **Buttons**: Primary (blue bg, white text), Accent (orange bg, white text), Secondary (outlined, muted border, foreground text)
 - **Product Card**: Image area, star rating (yellow ★), title (foreground), MRP (strikethrough, muted), selling price (bold, foreground), discount badge (orange bg, white text, animated pulse)
 - **Input Fields**: Muted border, focus ring uses primary blue
-- **Badges**: Discount (orange bg), Success (green bg), Alert (red bg) — all with white text, `text-xs` font-semibold
+- **Badges**: Discount (orange bg), Success (green bg), Alert (red bg), Label (primary bg + white text for Address labels: "Home", "Office", "Other") — all with white text, `text-xs` font-semibold
+- **Address Card**: White bg, muted border, label badge in top-right (primary bg), address text (foreground), edit/delete icon buttons (muted text, hover primary)
+- **Referral Code Box**: White bg, primary border (2px), monospace font, copy button (accent bg), share buttons (secondary outline)
 - **Star Rating**: Yellow (#ffca28 OKLCH), clickable/interactive states subtle shadow
+- **Comparison Attribute Row**: Checkbox-style indicators (green ✓ or grey ✗) for matching attributes across products
 
 ## Spacing & Rhythm
 
@@ -73,3 +79,8 @@
 ## Signature Detail
 
 **Pulsing Orange Discount Badges**: Orange (#fb641b) badge with green savings text and `animate-pulse-badge` 2s loop. Eyes draw instantly to time-sensitive offers. Placed below MRP (strikethrough) and selling price on every product card. This Flipkart-signature detail is the visual anchor for urgency and value perception across the marketplace.
+
+**Three New Feature Pages**:
+1. **Address Book** — Saved addresses as white cards with label badges ("Home"/"Office"/"Other" in primary blue), edit/delete inline actions, add new address button (primary). Emphasizes quick checkout.
+2. **Product Comparison** — Up to 4 products displayed side-by-side in white cards; attribute grid below shows checkmarks (green ✓) or crosses (grey ✗) for matching specs. Reduces decision friction.
+3. **Referral Program** — Unique referral code in monospace font within a primary-bordered box, copy button (orange accent), social share buttons (WhatsApp/email), stats cards showing total referrals and SuperCoins earned. Incentivizes viral growth.

@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BookMarked,
   CheckCircle2,
+  ChevronDown,
   CreditCard,
   MapPin,
   Star,
@@ -16,6 +18,7 @@ import {
   type CartItem,
   type Order,
   OrderStatus,
+  type SavedAddress,
   type ShoppingItem,
   Variant_cod_online,
 } from "../types";
@@ -123,6 +126,34 @@ export default function Checkout() {
   const [pointsApplying, setPointsApplying] = useState(false);
   const [pointsError, setPointsError] = useState("");
   const [redeemedPoints, setRedeemedPoints] = useState(0); // points actually redeemed
+
+  // Load saved addresses from localStorage
+  const savedAddresses = (() => {
+    try {
+      const raw = localStorage.getItem("shoapzy_saved_addresses");
+      if (!raw) return [] as SavedAddress[];
+      return JSON.parse(raw) as SavedAddress[];
+    } catch {
+      return [] as SavedAddress[];
+    }
+  })();
+
+  const [selectedSavedId, setSelectedSavedId] = useState<string>("");
+
+  const handleSelectSavedAddress = (id: string) => {
+    setSelectedSavedId(id);
+    if (!id) return;
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    setDeliveryAddress({
+      name: addr.name,
+      phone: addr.phone,
+      address: addr.street,
+      city: addr.city,
+      state: addr.state,
+      pincode: addr.pincode,
+    });
+  };
 
   const { data: cart = [] } = useQuery({
     queryKey: ["cart", identity?.getPrincipal().toString()],
@@ -356,6 +387,48 @@ export default function Checkout() {
               />
               {step === 1 && (
                 <div className="px-6 py-5">
+                  {/* Saved addresses quick-select */}
+                  {savedAddresses.length > 0 && (
+                    <div className="mb-5 p-3 rounded-sm border border-blue-100 bg-blue-50/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BookMarked
+                          className="w-4 h-4"
+                          style={{ color: "#2874f0" }}
+                        />
+                        <span
+                          className="text-sm font-semibold"
+                          style={{ color: "#2874f0" }}
+                        >
+                          Select from Saved Addresses
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <select
+                          value={selectedSavedId}
+                          onChange={(e) =>
+                            handleSelectSavedAddress(e.target.value)
+                          }
+                          className="w-full border border-input rounded-sm px-3 py-2 text-sm text-foreground bg-background focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors appearance-none pr-8"
+                          data-ocid="checkout-saved-address-select"
+                        >
+                          <option value="">— Choose a saved address —</option>
+                          {savedAddresses.map((addr) => (
+                            <option key={addr.id} value={addr.id}>
+                              [{addr.label.toUpperCase()}] {addr.name},{" "}
+                              {addr.city} - {addr.pincode}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+                      </div>
+                      {selectedSavedId && (
+                        <p className="text-xs mt-1.5 text-green-700 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Address filled
+                          from saved — you can still edit below
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {FIELD_CONFIG.map(
                       ({

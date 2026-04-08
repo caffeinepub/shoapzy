@@ -27,6 +27,12 @@ export interface SellerProfileData {
     shopName: string;
     totalReviews: bigint;
 }
+export interface ReferralStats {
+    bonusPointsEarned: bigint;
+    referralCode: string;
+    successfulReferrals: bigint;
+    totalReferrals: bigint;
+}
 export interface ReturnRequest {
     id: string;
     status: ReturnStatus;
@@ -35,6 +41,16 @@ export interface ReturnRequest {
     buyerId: Principal;
     timestamp: bigint;
     reason: string;
+}
+export interface SavedAddress {
+    id: string;
+    tag: AddressLabel;
+    street: string;
+    city: string;
+    name: string;
+    state: string;
+    phone: string;
+    pincode: string;
 }
 export interface CouponPublic {
     validFrom: bigint;
@@ -164,6 +180,11 @@ export interface UserProfile {
     sellerApproved: boolean;
     shopName?: string;
 }
+export enum AddressLabel {
+    other = "other",
+    home = "home",
+    office = "office"
+}
 export enum OrderStatus {
     shipped = "shipped",
     cancelled = "cancelled",
@@ -205,9 +226,23 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    addSavedAddress(address: SavedAddress): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     addToCart(item: CartItem): Promise<void>;
     addToWishlist(productId: string): Promise<boolean>;
     applyCoupon(code: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    applyReferralCode(code: string): Promise<{
         __kind__: "ok";
         ok: null;
     } | {
@@ -242,6 +277,13 @@ export interface backendInterface {
         err: string;
     }>;
     deleteProduct(productId: string): Promise<void>;
+    deleteSavedAddress(addressId: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getAllActiveCoupons(): Promise<Array<CouponPublic>>;
     getAllOrders(): Promise<Array<Order>>;
     getAllReturnRequests(): Promise<Array<ReturnRequest>>;
@@ -264,8 +306,11 @@ export interface backendInterface {
     getProductReviews(productId: string): Promise<Array<Review>>;
     getProductVariants(productId: string): Promise<Array<ProductVariant>>;
     getProducts(): Promise<Array<Product>>;
+    getReferralCode(): Promise<string>;
+    getReferralStats(): Promise<ReferralStats>;
     getReturnRequestByOrder(orderId: string): Promise<ReturnRequest | null>;
     getReviewSummaries(): Promise<Array<ReviewSummary>>;
+    getSavedAddresses(): Promise<Array<SavedAddress>>;
     getSellerOrders(seller: Principal): Promise<Array<Order>>;
     getSellerProducts(seller: Principal): Promise<Array<Product>>;
     getSellerProfileData(seller: Principal): Promise<SellerProfileData | null>;
@@ -308,6 +353,13 @@ export interface backendInterface {
     updateOrderStatus(orderId: string, status: OrderStatus): Promise<void>;
     updateProduct(product: Product): Promise<void>;
     updateProductVariants(productId: string, variants: Array<ProductVariant>): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updateSavedAddress(address: SavedAddress): Promise<{
         __kind__: "ok";
         ok: null;
     } | {
