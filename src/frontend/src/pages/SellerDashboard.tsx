@@ -9,6 +9,7 @@ import {
   Store,
   Tag,
   Trash2,
+  Truck,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,7 +18,12 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { ExternalBlob, type Order, type Product } from "../types";
+import {
+  ExternalBlob,
+  type Order,
+  type Product,
+  type ReturnRequest,
+} from "../types";
 
 const CATEGORIES = [
   "Electronics",
@@ -39,7 +45,19 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700 border-red-200",
 };
 
+const RETURN_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-orange-100 text-orange-700 border-orange-200",
+  approved: "bg-green-100 text-green-700 border-green-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+};
+
 type TabType = "products" | "orders" | "add";
+
+// Per-order status update state
+interface OrderUpdateState {
+  loading: boolean;
+  error: string | null;
+}
 
 export default function SellerDashboard() {
   const { actor } = useActor();
@@ -59,6 +77,9 @@ export default function SellerDashboard() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [orderUpdateState, setOrderUpdateState] = useState<
+    Record<string, OrderUpdateState>
+  >({});
 
   const principalStr = identity?.getPrincipal().toString();
   const enabled = !!actor && !!identity;
@@ -87,6 +108,33 @@ export default function SellerDashboard() {
     enabled,
   });
 
+  // Batch fetch return requests for all orders
+  const { data: returnRequests = {} } = useQuery({
+    queryKey: [
+      "sellerReturnRequests",
+      principalStr,
+      (orders as Order[]).length,
+    ],
+    queryFn: async () => {
+      if (!actor || !(orders as Order[]).length) return {};
+      const results: Record<string, ReturnRequest | null> = {};
+      await Promise.all(
+        (orders as Order[]).map(async (order) => {
+          try {
+            const req = (await (actor as any).getReturnRequestByOrder(
+              order.id,
+            )) as ReturnRequest | null;
+            results[order.id] = req;
+          } catch {
+            results[order.id] = null;
+          }
+        }),
+      );
+      return results;
+    },
+    enabled: enabled && (orders as Order[]).length > 0,
+  });
+
   const isApproved =
     sellerStatus === "approved" || profile?.sellerApproved === true;
 
@@ -98,6 +146,34 @@ export default function SellerDashboard() {
     (sum, o) => sum + Number(o.totalAmount) * 0.9,
     0,
   );
+
+  const handleUpdateOrderStatus = async (
+    orderId: string,
+    newStatus: string,
+  ) => {
+    if (!actor) return;
+    setOrderUpdateState((prev) => ({
+      ...prev,
+      [orderId]: { loading: true, error: null },
+    }));
+    try {
+      await (actor as any).updateSellerOrderStatus(orderId, newStatus);
+      await queryClient.invalidateQueries({
+        queryKey: ["sellerOrders", principalStr],
+      });
+      setOrderUpdateState((prev) => ({
+        ...prev,
+        [orderId]: { loading: false, error: null },
+      }));
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update order status";
+      setOrderUpdateState((prev) => ({
+        ...prev,
+        [orderId]: { loading: false, error: msg },
+      }));
+    }
+  };
 
   if (!isApproved) {
     return (
@@ -725,61 +801,128 @@ export default function SellerDashboard() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                        <th className="pb-3 pr-4 font-semibold">Order ID</th>
-                        <th className="pb-3 pr-4 font-semibold">Amount</th>
-                        <th className="pb-3 pr-4 font-semibold">
-                          Your Share (90%)
-                        </th>
-                        <th className="pb-3 font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {(orders as Order[]).map((order, i) => {
-                        const statusKey =
-                          typeof order.status === "object"
-                            ? Object.keys(order.status)[0]
-                            : String(order.status);
-                        const statusClass =
-                          ORDER_STATUS_COLORS[statusKey] ??
-                          "bg-gray-100 text-gray-600 border-gray-200";
-                        return (
-                          <tr
-                            key={order.id}
-                            className="hover:bg-gray-50 transition-colors"
-                            data-ocid={`seller.order.${i + 1}`}
-                          >
-                            <td className="py-3 pr-4 font-mono text-xs text-gray-500">
-                              #{order.id.slice(0, 12)}...
-                            </td>
-                            <td className="py-3 pr-4 font-bold text-gray-800">
-                              ₹
-                              {(
-                                Number(order.totalAmount) / 100
-                              ).toLocaleString()}
-                            </td>
-                            <td className="py-3 pr-4 font-semibold text-green-600">
-                              ₹
-                              {(
-                                (Number(order.totalAmount) * 0.9) /
-                                100
-                              ).toLocaleString()}
-                            </td>
-                            <td className="py-3">
+                <div className="space-y-3">
+                  {(orders as Order[]).map((order, i) => {
+                    const statusKey =
+                      typeof order.status === "object"
+                        ? Object.keys(order.status)[0]
+                        : String(order.status);
+                    const statusClass =
+                      ORDER_STATUS_COLORS[statusKey] ??
+                      "bg-gray-100 text-gray-600 border-gray-200";
+                    const updateState = orderUpdateState[order.id] ?? {
+                      loading: false,
+                      error: null,
+                    };
+                    const returnReq = (
+                      returnRequests as Record<string, ReturnRequest | null>
+                    )[order.id];
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="bg-white border border-gray-100 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                        data-ocid={`seller.order.${i + 1}`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          {/* Order info */}
+                          <div className="flex items-center gap-4 min-w-0">
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs text-gray-400">
+                                #{order.id.slice(0, 12)}...
+                              </p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="font-bold text-gray-800 text-sm">
+                                  ₹
+                                  {(
+                                    Number(order.totalAmount) / 100
+                                  ).toLocaleString()}
+                                </span>
+                                <span className="text-xs text-green-600 font-semibold">
+                                  Your share: ₹
+                                  {(
+                                    (Number(order.totalAmount) * 0.9) /
+                                    100
+                                  ).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status + actions */}
+                          <div className="flex flex-col items-end gap-2">
+                            {/* Current status badge */}
+                            <span
+                              className={`text-xs font-semibold px-2.5 py-1 rounded border ${statusClass}`}
+                            >
+                              {statusKey.toUpperCase()}
+                            </span>
+
+                            {/* Return request badge */}
+                            {returnReq && (
                               <span
-                                className={`text-xs font-semibold px-2.5 py-1 rounded border ${statusClass}`}
+                                className={`text-xs font-semibold px-2.5 py-1 rounded border ${
+                                  RETURN_STATUS_COLORS[returnReq.status] ??
+                                  "bg-gray-100 text-gray-600 border-gray-200"
+                                }`}
+                                data-ocid={`seller.order.${i + 1}.return_badge`}
                               >
-                                {statusKey.toUpperCase()}
+                                Return:{" "}
+                                {returnReq.status.charAt(0).toUpperCase() +
+                                  returnReq.status.slice(1)}
                               </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            )}
+
+                            {/* Status update button */}
+                            {statusKey === "approved" && (
+                              <Button
+                                size="sm"
+                                disabled={updateState.loading}
+                                onClick={() =>
+                                  handleUpdateOrderStatus(order.id, "shipped")
+                                }
+                                className="text-white text-xs h-8 px-3 font-semibold flex items-center gap-1.5"
+                                style={{ background: "#7c3aed" }}
+                                data-ocid={`seller.order.${i + 1}.mark_shipped`}
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                {updateState.loading
+                                  ? "Updating..."
+                                  : "Mark as Shipped"}
+                              </Button>
+                            )}
+                            {statusKey === "shipped" && (
+                              <Button
+                                size="sm"
+                                disabled={updateState.loading}
+                                onClick={() =>
+                                  handleUpdateOrderStatus(order.id, "delivered")
+                                }
+                                className="text-white text-xs h-8 px-3 font-semibold flex items-center gap-1.5"
+                                style={{ background: "#16a34a" }}
+                                data-ocid={`seller.order.${i + 1}.mark_delivered`}
+                              >
+                                <Package className="w-3.5 h-3.5" />
+                                {updateState.loading
+                                  ? "Updating..."
+                                  : "Mark as Delivered"}
+                              </Button>
+                            )}
+
+                            {/* Inline error */}
+                            {updateState.error && (
+                              <p
+                                className="text-xs text-red-500 text-right max-w-[200px]"
+                                data-ocid={`seller.order.${i + 1}.error`}
+                              >
+                                {updateState.error}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -23,6 +23,7 @@ export type ExternalBlob = Uint8Array;
 export interface Order {
   'id' : string,
   'status' : OrderStatus,
+  'deliveryAddress' : [] | [string],
   'paymentMethod' : { 'cod' : null } |
     { 'online' : null },
   'totalAmount' : bigint,
@@ -35,11 +36,16 @@ export type OrderStatus = { 'shipped' : null } |
   { 'pending' : null } |
   { 'paid' : null } |
   { 'approved' : null } |
-  { 'delivered' : null };
+  { 'return_requested' : null } |
+  { 'return_approved' : null } |
+  { 'delivered' : null } |
+  { 'return_rejected' : null };
 export interface Product {
   'id' : string,
+  'mrp' : bigint,
   'title' : string,
   'description' : string,
+  'discountPercent' : bigint,
   'seller' : Principal,
   'isActive' : boolean,
   'stock' : bigint,
@@ -47,6 +53,18 @@ export interface Product {
   'image' : ExternalBlob,
   'price' : bigint,
 }
+export interface ReturnRequest {
+  'id' : string,
+  'status' : ReturnStatus,
+  'orderId' : string,
+  'adminComment' : [] | [string],
+  'buyerId' : Principal,
+  'timestamp' : bigint,
+  'reason' : string,
+}
+export type ReturnStatus = { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
 export interface Review {
   'id' : bigint,
   'reviewText' : string,
@@ -155,6 +173,11 @@ export interface _SERVICE {
   >,
   'addToCart' : ActorMethod<[CartItem], undefined>,
   'addToWishlist' : ActorMethod<[string], boolean>,
+  'approveReturn' : ActorMethod<
+    [string, [] | [string]],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'approveSeller' : ActorMethod<[Principal], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'claimAdminRole' : ActorMethod<[], undefined>,
@@ -166,12 +189,14 @@ export interface _SERVICE {
   >,
   'deleteProduct' : ActorMethod<[string], undefined>,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getAllReturnRequests' : ActorMethod<[], Array<ReturnRequest>>,
   'getAllSellers' : ActorMethod<[], Array<SellerInfo>>,
   'getCallerCart' : ActorMethod<[], [] | [Array<CartItem>]>,
   'getCallerSellerStatus' : ActorMethod<[], string>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCallerWishlist' : ActorMethod<[], Array<string>>,
+  'getMyReturnRequests' : ActorMethod<[], Array<ReturnRequest>>,
   'getOrderCommissionBreakdown' : ActorMethod<
     [string],
     [] | [
@@ -187,6 +212,7 @@ export interface _SERVICE {
   'getProductAverageRating' : ActorMethod<[string], number>,
   'getProductReviews' : ActorMethod<[string], Array<Review>>,
   'getProducts' : ActorMethod<[], Array<Product>>,
+  'getReturnRequestByOrder' : ActorMethod<[string], [] | [ReturnRequest]>,
   'getReviewSummaries' : ActorMethod<[], Array<ReviewSummary>>,
   'getSellerOrders' : ActorMethod<[Principal], Array<Order>>,
   'getSellerProducts' : ActorMethod<[Principal], Array<Product>>,
@@ -202,15 +228,41 @@ export interface _SERVICE {
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'placeOrder' : ActorMethod<[Order], undefined>,
   'registerAsSeller' : ActorMethod<[string, [] | [string]], undefined>,
+  'rejectReturn' : ActorMethod<
+    [string, [] | [string]],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'rejectSeller' : ActorMethod<[Principal], undefined>,
   'removeFromWishlist' : ActorMethod<[string], boolean>,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'setStripeConfiguration' : ActorMethod<[StripeConfiguration], undefined>,
+  'submitReturnRequest' : ActorMethod<
+    [string, string],
+    { 'ok' : ReturnRequest } |
+      { 'err' : string }
+  >,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateOrderStatus' : ActorMethod<[string, OrderStatus], undefined>,
   'updateProduct' : ActorMethod<[Product], undefined>,
+  'updateSellerOrderStatus' : ActorMethod<
+    [
+      string,
+      { 'shipped' : null } |
+        { 'cancelled' : null } |
+        { 'pending' : null } |
+        { 'paid' : null } |
+        { 'approved' : null } |
+        { 'return_requested' : null } |
+        { 'return_approved' : null } |
+        { 'delivered' : null } |
+        { 'return_rejected' : null },
+    ],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

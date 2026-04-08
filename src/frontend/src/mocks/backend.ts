@@ -15,6 +15,8 @@ const sampleProduct = {
   category: "Footwear",
   image: ExternalBlob.fromURL("https://via.placeholder.com/300x300?text=Shoes"),
   price: BigInt(1499),
+  mrp: BigInt(1999),
+  discountPercent: BigInt(25),
 };
 
 const sampleProduct2 = {
@@ -27,6 +29,8 @@ const sampleProduct2 = {
   category: "Clothing",
   image: ExternalBlob.fromURL("https://via.placeholder.com/300x300?text=Kurti"),
   price: BigInt(599),
+  mrp: BigInt(799),
+  discountPercent: BigInt(25),
 };
 
 export const mockBackend: backendInterface = {
@@ -106,4 +110,11 @@ export const mockBackend: backendInterface = {
   getProductAverageRating: async () => 0,
   getProductReviews: async () => [],
   getReviewSummaries: async () => [],
+  approveReturn: async () => ({ __kind__: "ok" as const, ok: null }),
+  getAllReturnRequests: async () => [],
+  getMyReturnRequests: async () => [],
+  getReturnRequestByOrder: async () => null,
+  rejectReturn: async () => ({ __kind__: "ok" as const, ok: null }),
+  submitReturnRequest: async () => ({ __kind__: "ok" as const, ok: { id: "mock-return-id", status: "pending" as const, orderId: "mock-order-id", adminComment: undefined, buyerId: samplePrincipal, timestamp: BigInt(0), reason: "mock reason" } }),
+  updateSellerOrderStatus: async () => ({ __kind__: "ok" as const, ok: null }),
 };

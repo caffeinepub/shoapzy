@@ -22,8 +22,10 @@ export const _ImmutableObjectStorageRefillResult = IDL.Record({
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const Product = IDL.Record({
   'id' : IDL.Text,
+  'mrp' : IDL.Nat,
   'title' : IDL.Text,
   'description' : IDL.Text,
+  'discountPercent' : IDL.Nat,
   'seller' : IDL.Principal,
   'isActive' : IDL.Bool,
   'stock' : IDL.Nat,
@@ -55,16 +57,34 @@ export const OrderStatus = IDL.Variant({
   'pending' : IDL.Null,
   'paid' : IDL.Null,
   'approved' : IDL.Null,
+  'return_requested' : IDL.Null,
+  'return_approved' : IDL.Null,
   'delivered' : IDL.Null,
+  'return_rejected' : IDL.Null,
 });
 export const Order = IDL.Record({
   'id' : IDL.Text,
   'status' : OrderStatus,
+  'deliveryAddress' : IDL.Opt(IDL.Text),
   'paymentMethod' : IDL.Variant({ 'cod' : IDL.Null, 'online' : IDL.Null }),
   'totalAmount' : IDL.Nat,
   'timestamp' : IDL.Int,
   'buyer' : IDL.Principal,
   'items' : IDL.Vec(CartItem),
+});
+export const ReturnStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const ReturnRequest = IDL.Record({
+  'id' : IDL.Text,
+  'status' : ReturnStatus,
+  'orderId' : IDL.Text,
+  'adminComment' : IDL.Opt(IDL.Text),
+  'buyerId' : IDL.Principal,
+  'timestamp' : IDL.Int,
+  'reason' : IDL.Text,
 });
 export const SellerInfo = IDL.Record({
   'status' : IDL.Text,
@@ -173,6 +193,11 @@ export const idlService = IDL.Service({
     ),
   'addToCart' : IDL.Func([CartItem], [], []),
   'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'approveReturn' : IDL.Func(
+      [IDL.Text, IDL.Opt(IDL.Text)],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'approveSeller' : IDL.Func([IDL.Principal], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'claimAdminRole' : IDL.Func([], [], []),
@@ -185,12 +210,14 @@ export const idlService = IDL.Service({
     ),
   'deleteProduct' : IDL.Func([IDL.Text], [], []),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
   'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
   'getCallerCart' : IDL.Func([], [IDL.Opt(IDL.Vec(CartItem))], ['query']),
   'getCallerSellerStatus' : IDL.Func([], [IDL.Text], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getMyReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
   'getOrderCommissionBreakdown' : IDL.Func(
       [IDL.Text],
       [
@@ -217,6 +244,11 @@ export const idlService = IDL.Service({
   'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+  'getReturnRequestByOrder' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(ReturnRequest)],
+      ['query'],
+    ),
   'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
   'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
   'getSellerProducts' : IDL.Func(
@@ -240,12 +272,22 @@ export const idlService = IDL.Service({
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'placeOrder' : IDL.Func([Order], [], []),
   'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
+  'rejectReturn' : IDL.Func(
+      [IDL.Text, IDL.Opt(IDL.Text)],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'rejectSeller' : IDL.Func([IDL.Principal], [], []),
   'removeFromWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
   'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+  'submitReturnRequest' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : ReturnRequest, 'err' : IDL.Text })],
+      [],
+    ),
   'transform' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
@@ -253,6 +295,24 @@ export const idlService = IDL.Service({
     ),
   'updateOrderStatus' : IDL.Func([IDL.Text, OrderStatus], [], []),
   'updateProduct' : IDL.Func([Product], [], []),
+  'updateSellerOrderStatus' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Variant({
+          'shipped' : IDL.Null,
+          'cancelled' : IDL.Null,
+          'pending' : IDL.Null,
+          'paid' : IDL.Null,
+          'approved' : IDL.Null,
+          'return_requested' : IDL.Null,
+          'return_approved' : IDL.Null,
+          'delivered' : IDL.Null,
+          'return_rejected' : IDL.Null,
+        }),
+      ],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
@@ -272,8 +332,10 @@ export const idlFactory = ({ IDL }) => {
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Product = IDL.Record({
     'id' : IDL.Text,
+    'mrp' : IDL.Nat,
     'title' : IDL.Text,
     'description' : IDL.Text,
+    'discountPercent' : IDL.Nat,
     'seller' : IDL.Principal,
     'isActive' : IDL.Bool,
     'stock' : IDL.Nat,
@@ -305,16 +367,34 @@ export const idlFactory = ({ IDL }) => {
     'pending' : IDL.Null,
     'paid' : IDL.Null,
     'approved' : IDL.Null,
+    'return_requested' : IDL.Null,
+    'return_approved' : IDL.Null,
     'delivered' : IDL.Null,
+    'return_rejected' : IDL.Null,
   });
   const Order = IDL.Record({
     'id' : IDL.Text,
     'status' : OrderStatus,
+    'deliveryAddress' : IDL.Opt(IDL.Text),
     'paymentMethod' : IDL.Variant({ 'cod' : IDL.Null, 'online' : IDL.Null }),
     'totalAmount' : IDL.Nat,
     'timestamp' : IDL.Int,
     'buyer' : IDL.Principal,
     'items' : IDL.Vec(CartItem),
+  });
+  const ReturnStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const ReturnRequest = IDL.Record({
+    'id' : IDL.Text,
+    'status' : ReturnStatus,
+    'orderId' : IDL.Text,
+    'adminComment' : IDL.Opt(IDL.Text),
+    'buyerId' : IDL.Principal,
+    'timestamp' : IDL.Int,
+    'reason' : IDL.Text,
   });
   const SellerInfo = IDL.Record({
     'status' : IDL.Text,
@@ -420,6 +500,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'addToCart' : IDL.Func([CartItem], [], []),
     'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'approveReturn' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Text)],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'approveSeller' : IDL.Func([IDL.Principal], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'claimAdminRole' : IDL.Func([], [], []),
@@ -432,12 +517,14 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteProduct' : IDL.Func([IDL.Text], [], []),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
     'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
     'getCallerCart' : IDL.Func([], [IDL.Opt(IDL.Vec(CartItem))], ['query']),
     'getCallerSellerStatus' : IDL.Func([], [IDL.Text], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getMyReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
     'getOrderCommissionBreakdown' : IDL.Func(
         [IDL.Text],
         [
@@ -464,6 +551,11 @@ export const idlFactory = ({ IDL }) => {
     'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+    'getReturnRequestByOrder' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(ReturnRequest)],
+        ['query'],
+      ),
     'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
     'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
     'getSellerProducts' : IDL.Func(
@@ -491,12 +583,22 @@ export const idlFactory = ({ IDL }) => {
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'placeOrder' : IDL.Func([Order], [], []),
     'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
+    'rejectReturn' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Text)],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'rejectSeller' : IDL.Func([IDL.Principal], [], []),
     'removeFromWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
     'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+    'submitReturnRequest' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : ReturnRequest, 'err' : IDL.Text })],
+        [],
+      ),
     'transform' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],
@@ -504,6 +606,24 @@ export const idlFactory = ({ IDL }) => {
       ),
     'updateOrderStatus' : IDL.Func([IDL.Text, OrderStatus], [], []),
     'updateProduct' : IDL.Func([Product], [], []),
+    'updateSellerOrderStatus' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Variant({
+            'shipped' : IDL.Null,
+            'cancelled' : IDL.Null,
+            'pending' : IDL.Null,
+            'paid' : IDL.Null,
+            'approved' : IDL.Null,
+            'return_requested' : IDL.Null,
+            'return_approved' : IDL.Null,
+            'delivered' : IDL.Null,
+            'return_rejected' : IDL.Null,
+          }),
+        ],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
   });
 };
 

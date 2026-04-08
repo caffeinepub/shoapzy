@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type ApprovalStatus__575141016 = {#approved; #pending; #rejected};
 type CartItem__113002840 =
   {price : Nat; productId : Text; quantity : Nat; seller : Principal};
@@ -16,19 +16,21 @@ type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
-type OrderStatus__838108808 =
+type OldCartItem__287857270 =
+  {price : Nat; productId : Text; quantity : Nat; seller : Principal};
+type OldOrderStatus__13175761 =
   {#approved; #cancelled; #delivered; #paid; #pending; #shipped};
-type Order__762448211 =
+type OldOrder__235915581 =
   {
     buyer : Principal;
     id : Text;
-    items : [CartItem__113002840];
+    items : [OldCartItem__287857270];
     paymentMethod : {#cod; #online};
-    status : OrderStatus__838108808;
+    status : OldOrderStatus__13175761;
     timestamp : Int;
     totalAmount : Nat
   };
-type Product__853085059 =
+type OldProduct__278484740 =
   {
     category : Text;
     description : Text;
@@ -40,6 +42,54 @@ type Product__853085059 =
     stock : Nat;
     title : Text
   };
+type OrderStatus__838108808 =
+  {
+    #approved;
+    #cancelled;
+    #delivered;
+    #paid;
+    #pending;
+    #return_approved;
+    #return_rejected;
+    #return_requested;
+    #shipped
+  };
+type Order__762448211 =
+  {
+    buyer : Principal;
+    deliveryAddress : ?Text;
+    id : Text;
+    items : [CartItem__113002840];
+    paymentMethod : {#cod; #online};
+    status : OrderStatus__838108808;
+    timestamp : Int;
+    totalAmount : Nat
+  };
+type Product__853085059 =
+  {
+    category : Text;
+    description : Text;
+    discountPercent : Nat;
+    id : Text;
+    image : ExternalBlob__246066408;
+    isActive : Bool;
+    mrp : Nat;
+    price : Nat;
+    seller : Principal;
+    stock : Nat;
+    title : Text
+  };
+type ReturnRequest__638806511 =
+  {
+    adminComment : ?Text;
+    buyerId : Principal;
+    id : Text;
+    orderId : Text;
+    reason : Text;
+    status : ReturnStatus__186271959;
+    timestamp : Int
+  };
+type ReturnStatus__186271959 = {#approved; #pending; #rejected};
 type Review__422344017 =
   {
     buyerId : Principal;
@@ -59,7 +109,46 @@ type UserProfile__491224006 =
     shopName : ?Text
   };
 type UserRole__1054455867 = {#admin; #guest; #user};
-actor {
+actor ({
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable approvalState :
+    {
+      var approvalStatus :
+        Map__605269027<Principal, ApprovalStatus__575141016>
+    };
+  stable carts :
+    {
+      var root : Node__46230540<Principal, [CartItem__113002840]>;
+      var size : Nat__490723111
+    };
+  in orders : Map__605269027<Text, OldOrder__235915581>;
+  in products : Map__605269027<Text, OldProduct__278484740>;
+  stable rejectedSellers :
+    {var root : Node__46230540<Principal, Bool>; var size : Nat__490723111};
+  stable returnRequests :
+    {
+      var root : Node__46230540<Text, ReturnRequest__638806511>;
+      var size : Nat__490723111
+    };
+  stable var reviewCounter : Nat;
+  stable reviews :
+    {
+      var root : Node__46230540<Nat, Review__422344017>;
+      var size : Nat__490723111
+    };
+  stable storageState : {};
+  stable userProfiles :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    };
+  stable wishlists :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111}
+}, {
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -87,6 +176,11 @@ actor {
     };
   stable rejectedSellers :
     {var root : Node__46230540<Principal, Bool>; var size : Nat__490723111};
+  stable returnRequests :
+    {
+      var root : Node__46230540<Text, ReturnRequest__638806511>;
+      var size : Nat__490723111
+    };
   stable var reviewCounter : Nat;
   stable reviews :
     {
@@ -101,4 +195,4 @@ actor {
     };
   stable wishlists :
     {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111}
-};
+}) ;

@@ -16,8 +16,10 @@ export class ExternalBlob {
 }
 export interface Product {
     id: string;
+    mrp: bigint;
     title: string;
     description: string;
+    discountPercent: bigint;
     seller: Principal;
     isActive: boolean;
     stock: bigint;
@@ -41,14 +43,14 @@ export interface SellerInfo {
     shopDescription?: string;
     shopName: string;
 }
-export interface Order {
+export interface ReturnRequest {
     id: string;
-    status: OrderStatus;
-    paymentMethod: Variant_cod_online;
-    totalAmount: bigint;
+    status: ReturnStatus;
+    orderId: string;
+    adminComment?: string;
+    buyerId: Principal;
     timestamp: bigint;
-    buyer: Principal;
-    items: Array<CartItem>;
+    reason: string;
 }
 export interface http_header {
     value: string;
@@ -74,6 +76,16 @@ export interface ReviewSummary {
     productId: string;
     averageRating: number;
     reviewCount: bigint;
+}
+export interface Order {
+    id: string;
+    status: OrderStatus;
+    deliveryAddress?: string;
+    paymentMethod: Variant_cod_online;
+    totalAmount: bigint;
+    timestamp: bigint;
+    buyer: Principal;
+    items: Array<CartItem>;
 }
 export interface TransformationInput {
     context: Uint8Array;
@@ -128,7 +140,10 @@ export enum OrderStatus {
     pending = "pending",
     paid = "paid",
     approved = "approved",
-    delivered = "delivered"
+    return_requested = "return_requested",
+    return_approved = "return_approved",
+    delivered = "delivered",
+    return_rejected = "return_rejected"
 }
 export enum UserRole {
     admin = "admin",
@@ -150,6 +165,13 @@ export interface backendInterface {
     }>;
     addToCart(item: CartItem): Promise<void>;
     addToWishlist(productId: string): Promise<boolean>;
+    approveReturn(requestId: string, adminComment: string | null): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     approveSeller(seller: Principal): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     claimAdminRole(): Promise<void>;
@@ -158,12 +180,14 @@ export interface backendInterface {
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
     deleteProduct(productId: string): Promise<void>;
     getAllOrders(): Promise<Array<Order>>;
+    getAllReturnRequests(): Promise<Array<ReturnRequest>>;
     getAllSellers(): Promise<Array<SellerInfo>>;
     getCallerCart(): Promise<Array<CartItem> | null>;
     getCallerSellerStatus(): Promise<string>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCallerWishlist(): Promise<Array<string>>;
+    getMyReturnRequests(): Promise<Array<ReturnRequest>>;
     getOrderCommissionBreakdown(orderId: string): Promise<{
         adminCommission: bigint;
         sellerPayments: Array<[Principal, bigint]>;
@@ -174,6 +198,7 @@ export interface backendInterface {
     getProductAverageRating(productId: string): Promise<number>;
     getProductReviews(productId: string): Promise<Array<Review>>;
     getProducts(): Promise<Array<Product>>;
+    getReturnRequestByOrder(orderId: string): Promise<ReturnRequest | null>;
     getReviewSummaries(): Promise<Array<ReviewSummary>>;
     getSellerOrders(seller: Principal): Promise<Array<Order>>;
     getSellerProducts(seller: Principal): Promise<Array<Product>>;
@@ -189,13 +214,34 @@ export interface backendInterface {
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     placeOrder(order: Order): Promise<void>;
     registerAsSeller(shopName: string, shopDescription: string | null): Promise<void>;
+    rejectReturn(requestId: string, adminComment: string | null): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     rejectSeller(seller: Principal): Promise<void>;
     removeFromWishlist(productId: string): Promise<boolean>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setStripeConfiguration(config: StripeConfiguration): Promise<void>;
+    submitReturnRequest(orderId: string, reason: string): Promise<{
+        __kind__: "ok";
+        ok: ReturnRequest;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateOrderStatus(orderId: string, status: OrderStatus): Promise<void>;
     updateProduct(product: Product): Promise<void>;
+    updateSellerOrderStatus(orderId: string, newStatus: OrderStatus): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
 }

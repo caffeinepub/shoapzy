@@ -102,13 +102,31 @@ type Review =
    reviewText: text;
    timestamp: int;
  };
+type ReturnStatus = 
+ variant {
+   approved;
+   pending;
+   rejected;
+ };
+type ReturnRequest = 
+ record {
+   adminComment: opt text;
+   buyerId: principal;
+   id: text;
+   orderId: text;
+   reason: text;
+   status: ReturnStatus;
+   timestamp: int;
+ };
 type Product = 
  record {
    category: text;
    description: text;
+   discountPercent: nat;
    id: text;
    image: ExternalBlob;
    isActive: bool;
+   mrp: nat;
    price: nat;
    seller: principal;
    stock: nat;
@@ -121,11 +139,15 @@ type OrderStatus =
    delivered;
    paid;
    pending;
+   return_approved;
+   return_rejected;
+   return_requested;
    shipped;
  };
 type Order = 
  record {
    buyer: principal;
+   deliveryAddress: opt text;
    id: text;
    items: vec CartItem;
    paymentMethod: variant {
@@ -169,6 +191,11 @@ service : {
     });
   addToCart: (item: CartItem) -> ();
   addToWishlist: (productId: text) -> (bool);
+  approveReturn: (requestId: text, adminComment: opt text) ->
+   (variant {
+      err: text;
+      ok;
+    });
   approveSeller: (seller: principal) -> ();
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   claimAdminRole: () -> ();
@@ -178,12 +205,14 @@ service : {
    cancelUrl: text) -> (text);
   deleteProduct: (productId: text) -> ();
   getAllOrders: () -> (vec Order) query;
+  getAllReturnRequests: () -> (vec ReturnRequest) query;
   getAllSellers: () -> (vec SellerInfo) query;
   getCallerCart: () -> (opt vec CartItem) query;
   getCallerSellerStatus: () -> (text) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
   getCallerWishlist: () -> (vec text) query;
+  getMyReturnRequests: () -> (vec ReturnRequest) query;
   getOrderCommissionBreakdown: (orderId: text) ->
    (opt
      record {
@@ -199,6 +228,7 @@ service : {
   getProductAverageRating: (productId: text) -> (float64) query;
   getProductReviews: (productId: text) -> (vec Review) query;
   getProducts: () -> (vec Product) query;
+  getReturnRequestByOrder: (orderId: text) -> (opt ReturnRequest) query;
   getReviewSummaries: () -> (vec ReviewSummary) query;
   getSellerOrders: (seller: principal) -> (vec Order) query;
   getSellerProducts: (seller: principal) -> (vec Product) query;
@@ -214,13 +244,38 @@ service : {
   listApprovals: () -> (vec UserApprovalInfo) query;
   placeOrder: (order: Order) -> ();
   registerAsSeller: (shopName: text, shopDescription: opt text) -> ();
+  rejectReturn: (requestId: text, adminComment: opt text) ->
+   (variant {
+      err: text;
+      ok;
+    });
   rejectSeller: (seller: principal) -> ();
   removeFromWishlist: (productId: text) -> (bool);
   requestApproval: () -> ();
   saveCallerUserProfile: (profile: UserProfile) -> ();
   setApproval: (user: principal, status: ApprovalStatus) -> ();
   setStripeConfiguration: (config: StripeConfiguration) -> ();
+  submitReturnRequest: (orderId: text, reason: text) ->
+   (variant {
+      err: text;
+      ok: ReturnRequest;
+    });
   transform: (input: TransformationInput) -> (TransformationOutput) query;
   updateOrderStatus: (orderId: text, status: OrderStatus) -> ();
   updateProduct: (product: Product) -> ();
+  updateSellerOrderStatus: (orderId: text, newStatus:
+   variant {
+     approved;
+     cancelled;
+     delivered;
+     paid;
+     pending;
+     return_approved;
+     return_rejected;
+     return_requested;
+     shipped;
+   }) -> (variant {
+            err: text;
+            ok;
+          });
 }

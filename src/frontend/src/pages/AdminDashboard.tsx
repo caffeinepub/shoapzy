@@ -7,6 +7,8 @@ import {
   ChevronRight,
   IndianRupee,
   Package,
+  RefreshCw,
+  RotateCcw,
   ShoppingBag,
   Store,
   TrendingUp,
@@ -22,6 +24,16 @@ import {
   type SellerRegistration,
 } from "../types";
 
+interface ReturnRequest {
+  id: string;
+  orderId: string;
+  buyerId: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  timestamp: bigint;
+  adminComment: string | null;
+}
+
 interface SellerInfo {
   principal: Principal;
   shopDescription?: string;
@@ -29,7 +41,6 @@ interface SellerInfo {
   status: string;
 }
 
-import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -220,7 +231,13 @@ function SellerProductsRow({
   );
 }
 
-type AdminTab = "sellers" | "allSellers" | "orders" | "earnings";
+const RETURN_STATUS_BADGE: Record<string, string> = {
+  pending: "bg-orange-100 text-orange-700 border border-orange-200",
+  approved: "bg-green-100 text-green-700 border border-green-200",
+  rejected: "bg-red-100 text-red-700 border border-red-200",
+};
+
+type AdminTab = "sellers" | "allSellers" | "orders" | "earnings" | "returns";
 
 export default function AdminDashboard() {
   const { actor } = useActor();
@@ -254,6 +271,46 @@ export default function AdminDashboard() {
     queryFn: () => actor!.getPlatformEarnings(),
     enabled,
   });
+
+  const { data: allReturnRequests = [], isLoading: returnsLoading } = useQuery({
+    queryKey: ["allReturnRequests"],
+    queryFn: () =>
+      (actor as any).getAllReturnRequests() as Promise<ReturnRequest[]>,
+    enabled,
+  });
+
+  const returnList = allReturnRequests as ReturnRequest[];
+  const [returnActionLoading, setReturnActionLoading] = useState<string | null>(
+    null,
+  );
+
+  const handleApproveReturn = async (requestId: string) => {
+    setReturnActionLoading(`approve-${requestId}`);
+    try {
+      await (actor as any).approveReturn(requestId, null);
+      toast.success("Return request approved!");
+      queryClient.invalidateQueries({ queryKey: ["allReturnRequests"] });
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to approve return request.");
+    } finally {
+      setReturnActionLoading(null);
+    }
+  };
+
+  const handleRejectReturn = async (requestId: string) => {
+    setReturnActionLoading(`reject-${requestId}`);
+    try {
+      await (actor as any).rejectReturn(requestId, null);
+      toast.success("Return request rejected.");
+      queryClient.invalidateQueries({ queryKey: ["allReturnRequests"] });
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reject return request.");
+    } finally {
+      setReturnActionLoading(null);
+    }
+  };
 
   const handleApproveSeller = async (principal: Principal) => {
     const key = `approve-${principal.toString()}`;
@@ -311,6 +368,7 @@ export default function AdminDashboard() {
     { key: "sellers", label: "Pending Approvals", count: pendingList.length },
     { key: "allSellers", label: "All Sellers", count: sellerList.length },
     { key: "orders", label: "Orders", count: orderList.length },
+    { key: "returns", label: "Returns", count: returnList.length },
     { key: "earnings", label: "Platform Earnings" },
   ];
 
@@ -661,6 +719,123 @@ export default function AdminDashboard() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Returns Tab */}
+          {tab === "returns" && (
+            <div className="p-5">
+              {returnsLoading ? (
+                <div
+                  className="text-center py-12 text-gray-400"
+                  data-ocid="returns.loading_state"
+                >
+                  <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-gray-300" />
+                  Loading return requests...
+                </div>
+              ) : returnList.length === 0 ? (
+                <div
+                  className="text-center py-16"
+                  data-ocid="returns.empty_state"
+                >
+                  <RotateCcw className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                  <p className="text-gray-400 font-medium">
+                    No return requests yet
+                  </p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Buyer return requests will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {returnList.map((req, idx) => {
+                    const statusClass =
+                      RETURN_STATUS_BADGE[req.status] ??
+                      RETURN_STATUS_BADGE.pending;
+                    const isPending = req.status === "pending";
+                    const approvingThis =
+                      returnActionLoading === `approve-${req.id}`;
+                    const rejectingThis =
+                      returnActionLoading === `reject-${req.id}`;
+                    return (
+                      <div
+                        key={req.id}
+                        className="bg-white border border-gray-100 rounded-lg p-4"
+                        data-ocid={`returns.item.${idx + 1}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-mono text-xs text-gray-400">
+                                Order #{req.orderId.slice(0, 12)}...
+                              </span>
+                              <span
+                                className={`text-xs font-semibold px-2.5 py-0.5 rounded capitalize ${statusClass}`}
+                              >
+                                {req.status}
+                              </span>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-800 mb-1">
+                              Return Reason
+                            </p>
+                            <p className="text-sm text-gray-600 mb-2 leading-relaxed">
+                              {req.reason}
+                            </p>
+                            <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                              <span>
+                                <span className="font-medium text-gray-500">
+                                  Buyer:
+                                </span>{" "}
+                                <span className="font-mono">
+                                  {req.buyerId.slice(0, 20)}...
+                                </span>
+                              </span>
+                              <span>
+                                <span className="font-medium text-gray-500">
+                                  Date:
+                                </span>{" "}
+                                {new Date(
+                                  Number(req.timestamp),
+                                ).toLocaleDateString("en-IN")}
+                              </span>
+                            </div>
+                            {req.adminComment && (
+                              <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 border border-gray-100">
+                                Admin note: {req.adminComment}
+                              </p>
+                            )}
+                          </div>
+                          {isPending && (
+                            <div className="flex gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                className="bg-green-500 hover:bg-green-600 text-white font-semibold"
+                                disabled={approvingThis || rejectingThis}
+                                onClick={() => handleApproveReturn(req.id)}
+                                data-ocid={`returns.approve_button.${idx + 1}`}
+                              >
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                                {approvingThis ? "Approving..." : "Approve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-500 border-red-200 hover:bg-red-50"
+                                disabled={approvingThis || rejectingThis}
+                                onClick={() => handleRejectReturn(req.id)}
+                                data-ocid={`returns.reject_button.${idx + 1}`}
+                              >
+                                <XCircle className="w-3.5 h-3.5 mr-1" />
+                                {rejectingThis ? "Rejecting..." : "Reject"}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

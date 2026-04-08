@@ -11,9 +11,11 @@ import Text "mo:core/Text";
 import Array "mo:core/Array";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import MixinObjectStorage "mo:caffeineai-object-storage/Mixin";
+import ReturnsTypes "types/returns";
+import ReturnsMixin "mixins/returns-api";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   // Record seller registration
   public type SellerRegistration = {
@@ -45,6 +47,8 @@ actor {
     title : Text;
     description : Text;
     price : Nat;
+    mrp : Nat;
+    discountPercent : Nat;
     category : Text;
     image : Storage.ExternalBlob;
     seller : Principal;
@@ -68,6 +72,9 @@ actor {
     #shipped;
     #delivered;
     #cancelled;
+    #return_requested;
+    #return_approved;
+    #return_rejected;
   };
 
   type Order = {
@@ -78,6 +85,7 @@ actor {
     paymentMethod : { #online; #cod };
     status : OrderStatus;
     timestamp : Int;
+    deliveryAddress : ?Text;
   };
 
   public type AdminCommissionBreakdown = {
@@ -127,8 +135,12 @@ actor {
   let reviews = Map.empty<Nat, Review>();
   var reviewCounter : Nat = 0;
 
+  // Return requests
+  let returnRequests = Map.empty<Text, ReturnsTypes.ReturnRequest>();
+
   include MixinObjectStorage();
   include MixinAuthorization(accessControlState);
+  include ReturnsMixin(returnRequests, accessControlState, orders);
 
   // Helper: get seller status as text
   func getSellerStatus(principal : Principal) : Text {
@@ -299,6 +311,9 @@ actor {
           };
           case (#paid) { if (not isAdmin) { Runtime.trap("Unauthorized: Only admins can mark orders as paid") } };
           case (#pending) { Runtime.trap("Cannot change order back to pending status") };
+          case (#return_requested) { Runtime.trap("Use submitReturnRequest to request a return") };
+          case (#return_approved) { if (not isAdmin) { Runtime.trap("Unauthorized: Only admins can approve returns") } };
+          case (#return_rejected) { if (not isAdmin) { Runtime.trap("Unauthorized: Only admins can reject returns") } };
         };
 
         let updatedOrder = { existingOrder with status };

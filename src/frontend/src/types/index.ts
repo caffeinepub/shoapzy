@@ -46,6 +46,9 @@ export const OrderStatus = {
   shipped: { shipped: null },
   delivered: { delivered: null },
   cancelled: { cancelled: null },
+  return_requested: { return_requested: null },
+  return_approved: { return_approved: null },
+  return_rejected: { return_rejected: null },
 } as const;
 export type OrderStatusType = (typeof OrderStatus)[keyof typeof OrderStatus];
 // biome-ignore lint/suspicious/noExplicitAny: variant object
@@ -95,4 +98,16 @@ export interface ReviewSummary {
   productId: string;
   averageRating: number;
   reviewCount: bigint;
+}
+
+export type ReturnRequestStatus = "pending" | "approved" | "rejected";
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  buyerId: string;
+  reason: string;
+  status: ReturnRequestStatus;
+  timestamp: bigint;
+  adminComment: string | null;
 }
