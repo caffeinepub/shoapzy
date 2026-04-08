@@ -127,6 +127,22 @@ type ReturnRequest =
    status: ReturnStatus;
    timestamp: int;
  };
+type RedeemResult = 
+ variant {
+   err: text;
+   ok: record {
+         discountAmount: nat;
+         pointsUsed: nat;
+       };
+ };
+type ProductVariant = 
+ record {
+   color: opt text;
+   id: text;
+   price: opt float64;
+   size: opt text;
+   stock: nat;
+ };
 type Product = 
  record {
    category: text;
@@ -140,6 +156,7 @@ type Product =
    seller: principal;
    stock: nat;
    title: text;
+   variants: vec ProductVariant;
  };
 type OrderStatus = 
  variant {
@@ -203,6 +220,11 @@ service : {
   _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
   _initializeAccessControl: () -> ();
   addProduct: (product: Product) -> ();
+  addProductVariant: (productId: text, "variant": ProductVariant) ->
+   (variant {
+      err: text;
+      ok;
+    });
   addReview: (productId: text, rating: nat, reviewText: text) ->
    (variant {
       err: text;
@@ -245,6 +267,7 @@ service : {
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
   getCallerWishlist: () -> (vec text) query;
+  getLoyaltyPoints: () -> (nat) query;
   getMyReturnRequests: () -> (vec ReturnRequest) query;
   getOrderCommissionBreakdown: (orderId: text) ->
    (opt
@@ -260,6 +283,7 @@ service : {
   getPlatformEarnings: () -> (nat) query;
   getProductAverageRating: (productId: text) -> (float64) query;
   getProductReviews: (productId: text) -> (vec Review) query;
+  getProductVariants: (productId: text) -> (vec ProductVariant) query;
   getProducts: () -> (vec Product) query;
   getReturnRequestByOrder: (orderId: text) -> (opt ReturnRequest) query;
   getReviewSummaries: () -> (vec ReviewSummary) query;
@@ -279,6 +303,8 @@ service : {
   listApprovals: () -> (vec UserApprovalInfo) query;
   listCoupons: () -> (vec CouponPublic) query;
   placeOrder: (order: Order) -> ();
+  redeemLoyaltyPoints: (pointsToRedeem: nat, orderTotal: nat) ->
+   (RedeemResult);
   registerAsSeller: (shopName: text, shopDescription: opt text) -> ();
   rejectReturn: (requestId: text, adminComment: opt text) ->
    (variant {
@@ -299,6 +325,11 @@ service : {
   transform: (input: TransformationInput) -> (TransformationOutput) query;
   updateOrderStatus: (orderId: text, status: OrderStatus) -> ();
   updateProduct: (product: Product) -> ();
+  updateProductVariants: (productId: text, variants: vec ProductVariant) ->
+   (variant {
+      err: text;
+      ok;
+    });
   updateSellerOrderStatus: (orderId: text, newStatus:
    variant {
      approved;

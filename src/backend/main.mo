@@ -16,9 +16,13 @@ import ReturnsMixin "mixins/returns-api";
 import SellerProfileMixin "mixins/seller-profile-api";
 import CouponsTypes "types/coupons";
 import CouponsApi "mixins/coupons-api";
+import VariantTypes "types/variants";
+import VariantsApi "mixins/variants-api";
+import LoyaltyApi "mixins/loyalty-api";
+import LoyaltyLib "lib/loyalty";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   // Record seller registration
   public type SellerRegistration = {
@@ -57,6 +61,7 @@ actor {
     seller : Principal;
     stock : Nat;
     isActive : Bool;
+    variants : [VariantTypes.ProductVariant];
   };
 
   // For storing shopping cart items
@@ -144,11 +149,16 @@ actor {
   // Coupons
   let coupons = Map.empty<Text, CouponsTypes.Coupon>();
 
+  // Loyalty points: keyed by Principal, value is points balance
+  let loyaltyPoints = Map.empty<Principal, Nat>();
+
   include MixinObjectStorage();
   include MixinAuthorization(accessControlState);
   include ReturnsMixin(returnRequests, accessControlState, orders);
   include SellerProfileMixin(userProfiles, products, reviews);
   include CouponsApi(coupons, accessControlState);
+  include VariantsApi(products, accessControlState);
+  include LoyaltyApi(loyaltyPoints);
 
   // Helper: get seller status as text
   func getSellerStatus(principal : Principal) : Text {
@@ -281,6 +291,8 @@ actor {
       Runtime.trap("Please login to place an order");
     };
     orders.add(order.id, order);
+    // Award loyalty points: 1 point per 10 rupees spent
+    LoyaltyLib.awardPoints(loyaltyPoints, caller, order.totalAmount);
   };
 
   public shared ({ caller }) func updateOrderStatus(orderId : Text, status : OrderStatus) : async () {

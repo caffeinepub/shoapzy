@@ -1,5 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CreditCard, MapPin, Tag, Truck, X } from "lucide-react";
+import {
+  CheckCircle2,
+  CreditCard,
+  MapPin,
+  Star,
+  Tag,
+  Truck,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
@@ -87,6 +95,9 @@ export default function Checkout() {
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
   const [placing, setPlacing] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState<{
+    pointsEarned: number;
+  } | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress>({
     name: "",
@@ -106,6 +117,13 @@ export default function Checkout() {
   } | null>(null);
   const [couponError, setCouponError] = useState("");
 
+  // Loyalty points state
+  const [pointsToRedeem, setPointsToRedeem] = useState("");
+  const [pointsApplied, setPointsApplied] = useState(0); // actual discount in paise
+  const [pointsApplying, setPointsApplying] = useState(false);
+  const [pointsError, setPointsError] = useState("");
+  const [redeemedPoints, setRedeemedPoints] = useState(0); // points actually redeemed
+
   const { data: cart = [] } = useQuery({
     queryKey: ["cart", identity?.getPrincipal().toString()],
     queryFn: async () => (await actor!.getCallerCart()) ?? [],
@@ -118,15 +136,39 @@ export default function Checkout() {
     enabled: !!actor,
   });
 
+  const { data: loyaltyPoints = BigInt(0) } = useQuery({
+    queryKey: ["loyaltyPoints", identity?.getPrincipal().toString()],
+    queryFn: async () => {
+      const pts = await actor!.getLoyaltyPoints();
+      return pts;
+    },
+    enabled: !!actor && !!identity,
+  });
+
+  const availablePoints = Number(loyaltyPoints);
+
   const cartItems = cart as CartItem[];
   const subtotal = cartItems.reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0,
   );
-  const discountAmount = appliedCoupon
+  const couponDiscountAmount = appliedCoupon
     ? Math.round((subtotal * appliedCoupon.discountPercent) / 100)
     : 0;
-  const total = subtotal - discountAmount;
+  // Points discount: 1 point = ₹1 = 100 paise, max 20% of subtotal
+  const maxPointsDiscount = Math.floor(subtotal * 0.2);
+  const previewPointsDiscount =
+    pointsToRedeem && !redeemedPoints
+      ? Math.min(
+          Math.min(Number(pointsToRedeem), availablePoints) * 100,
+          maxPointsDiscount,
+        )
+      : pointsApplied;
+  const totalDiscount = couponDiscountAmount + previewPointsDiscount;
+  const total = Math.max(0, subtotal - totalDiscount);
+
+  // Earnings estimate: 1% of order value in points
+  const pointsEarnEstimate = Math.floor(total / 10000);
 
   const isAddressComplete = FIELD_CONFIG.every((f) =>
     deliveryAddress[f.field].trim(),
@@ -169,12 +211,47 @@ export default function Checkout() {
     setCouponError("");
   };
 
+  const handleApplyPoints = async () => {
+    if (!actor || !pointsToRedeem) return;
+    const pts = Number(pointsToRedeem);
+    if (pts <= 0 || pts > availablePoints) {
+      setPointsError(`Enter a value between 1 and ${availablePoints}`);
+      return;
+    }
+    const discountPaise = Math.min(pts * 100, maxPointsDiscount);
+    const actualPoints = Math.ceil(discountPaise / 100);
+
+    setPointsApplying(true);
+    setPointsError("");
+    try {
+      const result = await actor.redeemLoyaltyPoints(BigInt(actualPoints));
+      if (result.__kind === "ok") {
+        setPointsApplied(discountPaise);
+        setRedeemedPoints(actualPoints);
+        setPointsToRedeem("");
+        queryClient.invalidateQueries({ queryKey: ["loyaltyPoints"] });
+      } else {
+        setPointsError(result.err ?? "Failed to redeem points.");
+      }
+    } catch {
+      setPointsError("Failed to apply points. Please try again.");
+    } finally {
+      setPointsApplying(false);
+    }
+  };
+
+  const handleRemovePoints = () => {
+    setPointsApplied(0);
+    setRedeemedPoints(0);
+    setPointsToRedeem("");
+    setPointsError("");
+  };
+
   const handlePlaceOrder = async () => {
     if (!actor || !identity || cartItems.length === 0 || !isAddressComplete)
       return;
     setPlacing(true);
     try {
-      // Increment coupon usage if applied
       if (appliedCoupon) {
         await actor.applyCoupon(appliedCoupon.code);
       }
@@ -208,11 +285,60 @@ export default function Checkout() {
       await actor.placeOrder(order);
       await actor.clearCallerCart();
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-      navigate("/orders");
+      queryClient.invalidateQueries({ queryKey: ["loyaltyPoints"] });
+      setOrderSuccess({ pointsEarned: pointsEarnEstimate });
     } finally {
       setPlacing(false);
     }
   };
+
+  if (orderSuccess) {
+    return (
+      <div
+        style={{ background: "#f1f3f6" }}
+        className="min-h-screen flex items-center justify-center"
+      >
+        <div className="bg-card rounded-sm shadow-md p-10 text-center max-w-md w-full mx-4">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: "#e8f5e9" }}
+          >
+            <CheckCircle2 className="w-8 h-8" style={{ color: "#388e3c" }} />
+          </div>
+          <h2 className="text-xl font-bold mb-2" style={{ color: "#388e3c" }}>
+            Order Placed Successfully!
+          </h2>
+          <p className="text-muted-foreground text-sm mb-4">
+            Your order has been placed and is being processed.
+          </p>
+          {orderSuccess.pointsEarned > 0 && (
+            <div
+              className="flex items-center justify-center gap-2 rounded-sm px-4 py-3 mb-5 text-sm font-semibold"
+              style={{
+                background: "#fffbea",
+                border: "1px solid #f59e0b",
+                color: "#92400e",
+              }}
+            >
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              You earned{" "}
+              <span className="font-bold">{orderSuccess.pointsEarned} pts</span>{" "}
+              loyalty points from this order!
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate("/orders")}
+            style={{ background: "#2874f0" }}
+            className="text-white font-semibold px-8 py-2.5 rounded-sm hover:opacity-90 transition-opacity text-sm"
+            data-ocid="checkout-view-orders-btn"
+          >
+            VIEW MY ORDERS
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: "#f1f3f6" }} className="min-h-screen">
@@ -304,7 +430,7 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Step 2: Order Summary + Coupon */}
+            {/* Step 2: Order Summary + Coupon + Loyalty Points */}
             <div className="bg-card shadow-sm rounded-sm overflow-hidden">
               <StepHeader
                 number={2}
@@ -394,7 +520,7 @@ export default function Checkout() {
                         <button
                           type="button"
                           onClick={handleRemoveCoupon}
-                          className="text-gray-400 hover:text-red-500 transition-colors ml-2"
+                          className="text-muted-foreground hover:text-red-500 transition-colors ml-2"
                           aria-label="Remove coupon"
                           data-ocid="checkout-remove-coupon"
                         >
@@ -438,6 +564,157 @@ export default function Checkout() {
                     )}
                   </div>
 
+                  {/* Loyalty Points Section */}
+                  <div
+                    className="mt-4 rounded-sm p-4"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #fffbea 0%, #fef3c7 100%)",
+                      border: "1.5px solid #f59e0b",
+                    }}
+                    data-ocid="checkout-loyalty-section"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Star
+                          className="w-4 h-4 fill-amber-400"
+                          style={{ color: "#d97706" }}
+                        />
+                        <span
+                          className="text-sm font-bold"
+                          style={{ color: "#92400e" }}
+                        >
+                          Use Your Points
+                        </span>
+                      </div>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#92400e",
+                          border: "1px solid #fbbf24",
+                        }}
+                      >
+                        {availablePoints} pts available
+                      </span>
+                    </div>
+
+                    <p className="text-xs mb-3" style={{ color: "#a16207" }}>
+                      You have{" "}
+                      <strong>
+                        {availablePoints} pts = ₹{availablePoints}
+                      </strong>
+                      . Redeem up to <strong>20% of order total</strong> (max ₹
+                      {(maxPointsDiscount / 100).toLocaleString()}).
+                    </p>
+
+                    {redeemedPoints > 0 ? (
+                      <div
+                        className="flex items-center justify-between rounded-sm px-3 py-2"
+                        style={{
+                          background: "#fef9ee",
+                          border: "1px solid #fbbf24",
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2
+                            className="w-4 h-4 flex-shrink-0"
+                            style={{ color: "#d97706" }}
+                          />
+                          <div>
+                            <span
+                              className="text-sm font-bold"
+                              style={{ color: "#92400e" }}
+                            >
+                              {redeemedPoints} pts redeemed
+                            </span>
+                            <span
+                              className="text-xs ml-2"
+                              style={{ color: "#a16207" }}
+                            >
+                              — ₹{(pointsApplied / 100).toLocaleString()} off!
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemovePoints}
+                          className="transition-colors ml-2"
+                          style={{ color: "#b45309" }}
+                          aria-label="Remove points"
+                          data-ocid="checkout-remove-points"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={availablePoints}
+                            value={pointsToRedeem}
+                            onChange={(e) => {
+                              setPointsToRedeem(e.target.value);
+                              setPointsError("");
+                            }}
+                            placeholder={`Max ${availablePoints} pts`}
+                            className="flex-1 border rounded-sm px-3 py-2 text-sm bg-background focus:outline-none transition-colors"
+                            style={{
+                              borderColor: "#f59e0b",
+                              color: "#92400e",
+                            }}
+                            data-ocid="checkout-points-input"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyPoints}
+                            disabled={
+                              !pointsToRedeem ||
+                              availablePoints === 0 ||
+                              pointsApplying
+                            }
+                            className="font-semibold px-5 py-2 rounded-sm text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                            style={{ background: "#d97706" }}
+                            data-ocid="checkout-apply-points-btn"
+                          >
+                            {pointsApplying ? "Applying..." : "APPLY"}
+                          </button>
+                        </div>
+                        {/* Live preview */}
+                        {pointsToRedeem && Number(pointsToRedeem) > 0 && (
+                          <p
+                            className="text-xs font-medium"
+                            style={{ color: "#92400e" }}
+                          >
+                            ✓ You'll save ₹
+                            {(
+                              Math.min(
+                                Math.min(
+                                  Number(pointsToRedeem),
+                                  availablePoints,
+                                ) * 100,
+                                maxPointsDiscount,
+                              ) / 100
+                            ).toLocaleString()}{" "}
+                            with these points
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {pointsError && (
+                      <p
+                        className="text-xs mt-2 flex items-center gap-1"
+                        style={{ color: "#b91c1c" }}
+                      >
+                        <X className="w-3 h-3" />
+                        {pointsError}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="mt-5 flex justify-end">
                     <button
                       type="button"
@@ -459,6 +736,14 @@ export default function Checkout() {
                       <span className="ml-2 text-green-600 font-medium">
                         · Coupon: {appliedCoupon.code} (
                         {appliedCoupon.discountPercent}% off)
+                      </span>
+                    )}
+                    {redeemedPoints > 0 && (
+                      <span
+                        className="ml-2 font-medium"
+                        style={{ color: "#d97706" }}
+                      >
+                        · {redeemedPoints} pts redeemed
                       </span>
                     )}
                   </div>
@@ -543,36 +828,90 @@ export default function Checkout() {
                     </label>
                   </div>
 
-                  {/* Order Review with coupon discount */}
-                  {appliedCoupon && (
-                    <div className="mt-5 border border-green-200 rounded-sm bg-green-50/60 p-4">
-                      <p className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wide">
-                        Order Total Breakdown
-                      </p>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Subtotal</span>
-                          <span>₹{(subtotal / 100).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-green-700 font-medium">
+                  {/* Order Total Breakdown — always shown in step 3 */}
+                  <div
+                    className="mt-5 rounded-sm p-4"
+                    style={{
+                      background: "#f8f9fa",
+                      border: "1px solid #e0e0e0",
+                    }}
+                  >
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                      Order Total Breakdown
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between text-foreground">
+                        <span>Subtotal</span>
+                        <span>₹{(subtotal / 100).toLocaleString()}</span>
+                      </div>
+                      {appliedCoupon ? (
+                        <div
+                          className="flex justify-between font-medium"
+                          style={{ color: "#388e3c" }}
+                        >
                           <span className="flex items-center gap-1">
                             <Tag className="w-3.5 h-3.5" />
                             Coupon ({appliedCoupon.code} —{" "}
                             {appliedCoupon.discountPercent}% off)
                           </span>
                           <span>
-                            − ₹{(discountAmount / 100).toLocaleString()}
+                            − ₹{(couponDiscountAmount / 100).toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex justify-between font-bold text-foreground border-t border-green-200 pt-2 mt-1">
-                          <span>Final Total</span>
-                          <span style={{ color: "#2874f0" }}>
-                            ₹{(total / 100).toLocaleString()}
+                      ) : (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Coupon Discount</span>
+                          <span>− ₹0</span>
+                        </div>
+                      )}
+                      {redeemedPoints > 0 ? (
+                        <div
+                          className="flex justify-between font-medium"
+                          style={{ color: "#d97706" }}
+                        >
+                          <span className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 fill-amber-400" />
+                            Points Discount ({redeemedPoints} pts)
+                          </span>
+                          <span>
+                            − ₹{(pointsApplied / 100).toLocaleString()}
                           </span>
                         </div>
+                      ) : (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Points Discount</span>
+                          <span>− ₹0</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-foreground">
+                        <span>Delivery Charges</span>
+                        <span
+                          style={{ color: "#388e3c" }}
+                          className="font-medium"
+                        >
+                          FREE
+                        </span>
+                      </div>
+                      <div
+                        className="flex justify-between font-bold text-base border-t pt-2 mt-1"
+                        style={{ borderColor: "#e0e0e0" }}
+                      >
+                        <span className="text-foreground">Final Total</span>
+                        <span style={{ color: "#2874f0" }}>
+                          ₹{(total / 100).toLocaleString()}
+                        </span>
                       </div>
                     </div>
-                  )}
+                    {pointsEarnEstimate > 0 && (
+                      <p
+                        className="text-xs mt-3 flex items-center gap-1 font-medium"
+                        style={{ color: "#92400e" }}
+                      >
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        You'll earn ~{pointsEarnEstimate} pts from this order
+                      </p>
+                    )}
+                  </div>
 
                   <div className="mt-6 flex justify-end">
                     <button
@@ -592,7 +931,7 @@ export default function Checkout() {
           </div>
 
           {/* Right: Price Summary */}
-          <div className="w-80 flex-shrink-0">
+          <div className="w-80 flex-shrink-0 space-y-3">
             <div
               className="bg-card shadow-sm rounded-sm p-5"
               data-ocid="checkout-price-summary"
@@ -608,23 +947,30 @@ export default function Checkout() {
                   </span>
                   <span>₹{(subtotal / 100).toLocaleString()}</span>
                 </div>
-                {appliedCoupon ? (
-                  <div
-                    className="flex justify-between"
-                    style={{ color: "#388e3c" }}
-                  >
-                    <span className="flex items-center gap-1">
-                      <Tag className="w-3 h-3" />
-                      Coupon ({appliedCoupon.discountPercent}% off)
-                    </span>
-                    <span>− ₹{(discountAmount / 100).toLocaleString()}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between text-foreground">
-                    <span>Discount</span>
-                    <span style={{ color: "#388e3c" }}>− ₹0</span>
-                  </div>
-                )}
+                <div
+                  className="flex justify-between"
+                  style={{ color: "#388e3c" }}
+                >
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    Coupon Discount
+                  </span>
+                  <span>
+                    − ₹{(couponDiscountAmount / 100).toLocaleString()}
+                  </span>
+                </div>
+                <div
+                  className="flex justify-between"
+                  style={{ color: "#d97706" }}
+                >
+                  <span className="flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-amber-400" />
+                    Points Discount
+                  </span>
+                  <span>
+                    − ₹{(previewPointsDiscount / 100).toLocaleString()}
+                  </span>
+                </div>
                 <div className="flex justify-between text-foreground">
                   <span>Delivery Charges</span>
                   <span style={{ color: "#388e3c" }} className="font-medium">
@@ -636,13 +982,71 @@ export default function Checkout() {
                 <span>Total Amount</span>
                 <span>₹{(total / 100).toLocaleString()}</span>
               </div>
-              {appliedCoupon && (
-                <p className="text-xs mt-2 text-green-700 font-medium text-center bg-green-50 rounded px-2 py-1.5 border border-green-100">
-                  🎉 You save ₹{(discountAmount / 100).toLocaleString()} with
-                  coupon!
+              {totalDiscount > 0 && (
+                <p
+                  className="text-xs mt-2 font-medium text-center rounded px-2 py-1.5 border"
+                  style={{
+                    color: "#166534",
+                    background: "#f0fdf4",
+                    borderColor: "#bbf7d0",
+                  }}
+                >
+                  🎉 You save ₹{(totalDiscount / 100).toLocaleString()} on this
+                  order!
                 </p>
               )}
             </div>
+
+            {/* Loyalty points balance card */}
+            {availablePoints > 0 && (
+              <div
+                className="rounded-sm p-4 shadow-sm"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #fffbea 0%, #fef3c7 100%)",
+                  border: "1.5px solid #f59e0b",
+                }}
+                data-ocid="checkout-points-balance-card"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Star
+                    className="w-4 h-4 fill-amber-400"
+                    style={{ color: "#d97706" }}
+                  />
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: "#92400e" }}
+                  >
+                    Your Loyalty Points
+                  </span>
+                </div>
+                <p
+                  className="text-lg font-extrabold"
+                  style={{ color: "#d97706" }}
+                >
+                  {availablePoints} pts
+                  <span
+                    className="text-xs font-normal ml-2"
+                    style={{ color: "#a16207" }}
+                  >
+                    = ₹{availablePoints}
+                  </span>
+                </p>
+                {redeemedPoints === 0 && (
+                  <p className="text-xs mt-1" style={{ color: "#a16207" }}>
+                    Apply in Order Summary to save more!
+                  </p>
+                )}
+                {redeemedPoints > 0 && (
+                  <p
+                    className="text-xs mt-1 font-semibold"
+                    style={{ color: "#388e3c" }}
+                  >
+                    ✓ {redeemedPoints} pts applied
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

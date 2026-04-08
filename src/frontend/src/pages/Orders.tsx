@@ -5,12 +5,15 @@ import {
   RefreshCw,
   RotateCcw,
   ShoppingBag,
+  Star,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { type Order, OrderStatus, type ReturnRequest } from "../types";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DeliveryAddress {
   name?: string;
@@ -37,6 +40,8 @@ interface StatusConfig {
   border: string;
   stepIndex: number;
 }
+
+// ─── Status Config ─────────────────────────────────────────────────────────────
 
 const STATUS_MAP: Record<string, StatusConfig> = {
   pending: {
@@ -106,9 +111,49 @@ const STATUS_MAP: Record<string, StatusConfig> = {
 
 const ORDER_STEPS = ["Ordered", "Confirmed", "Shipped", "Delivered"];
 
+// ─── Filter Tab Config ─────────────────────────────────────────────────────────
+
+type FilterTab = "all" | "active" | "delivered" | "cancelled" | "returns";
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "All Orders" },
+  { key: "active", label: "Active" },
+  { key: "delivered", label: "Delivered" },
+  { key: "cancelled", label: "Cancelled" },
+  { key: "returns", label: "Returns" },
+];
+
+function matchesFilter(statusKey: string, filter: FilterTab): boolean {
+  if (filter === "all") return true;
+  if (filter === "active")
+    return ["pending", "approved", "shipped"].includes(statusKey);
+  if (filter === "delivered") return ["delivered", "paid"].includes(statusKey);
+  if (filter === "cancelled") return statusKey === "cancelled";
+  if (filter === "returns")
+    return ["return_requested", "return_approved", "return_rejected"].includes(
+      statusKey,
+    );
+  return true;
+}
+
+// ─── Helper ────────────────────────────────────────────────────────────────────
+
+function formatDate(ts: bigint): string {
+  return new Date(Number(ts)).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function calcPoints(totalAmount: bigint): number {
+  return Math.floor(Number(totalAmount) / 100 / 10);
+}
+
+// ─── OrderTracker ──────────────────────────────────────────────────────────────
+
 function OrderTracker({ status }: { status: string }) {
   const config = STATUS_MAP[status];
-  // For return statuses, show full delivery tracker as completed
   const isReturnStatus = [
     "return_requested",
     "return_approved",
@@ -188,7 +233,8 @@ function OrderTracker({ status }: { status: string }) {
   );
 }
 
-// Return status badge
+// ─── Return Status Badge ───────────────────────────────────────────────────────
+
 const RETURN_STATUS_BADGE: Record<
   string,
   { bg: string; color: string; border: string; label: string }
@@ -212,6 +258,8 @@ const RETURN_STATUS_BADGE: Record<
     label: "Return Rejected",
   },
 };
+
+// ─── ReturnSection ─────────────────────────────────────────────────────────────
 
 interface ReturnSectionProps {
   orderId: string;
@@ -355,12 +403,74 @@ function ReturnSection({
   );
 }
 
+// ─── LoyaltyCard ───────────────────────────────────────────────────────────────
+
+function LoyaltyCard({ points }: { points: number }) {
+  return (
+    <div
+      className="rounded-sm overflow-hidden shadow-sm mb-4"
+      style={{
+        background:
+          "linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%)",
+      }}
+      data-ocid="loyalty-points-card"
+    >
+      <div className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.2)" }}
+          >
+            <Star className="w-5 h-5 text-white fill-white" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-amber-100 uppercase tracking-wide">
+              Your Loyalty Points
+            </p>
+            <p className="text-2xl font-bold text-white">
+              {points.toLocaleString()} pts
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-amber-100">Savings Value</p>
+          <p className="text-xl font-bold text-white">
+            ₹{points.toLocaleString()}
+          </p>
+          <p className="text-xs text-amber-200 mt-0.5">1 pt = ₹1</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PointsBadge ───────────────────────────────────────────────────────────────
+
+function PointsBadge({ points }: { points: number }) {
+  if (points <= 0) return null;
+  return (
+    <div
+      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+      style={{
+        background: "#fef3c7",
+        color: "#b45309",
+        border: "1px solid #fde68a",
+      }}
+    >
+      <Star className="w-3 h-3 fill-amber-500 text-amber-500" />+{points} pts
+      earned
+    </div>
+  );
+}
+
+// ─── Orders Page ───────────────────────────────────────────────────────────────
+
 export default function Orders() {
   const { actor } = useActor();
   const { identity } = useInternetIdentity();
   const navigate = useNavigate();
 
-  // Local map of return requests keyed by orderId (optimistic state)
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [localReturnRequests, setLocalReturnRequests] = useState<
     Record<string, ReturnRequest>
   >({});
@@ -377,7 +487,6 @@ export default function Orders() {
     enabled: !!actor,
   });
 
-  // Load return requests from backend
   const { data: returnRequests = [] } = useQuery<ReturnRequest[]>({
     queryKey: ["returnRequests", identity?.getPrincipal().toString()],
     queryFn: async () => {
@@ -392,15 +501,27 @@ export default function Orders() {
     enabled: !!actor && !!identity,
   });
 
-  // Build a map: orderId -> ReturnRequest (backend + local optimistic)
+  const { data: loyaltyPointsRaw } = useQuery<bigint>({
+    queryKey: ["loyaltyPoints", identity?.getPrincipal().toString()],
+    queryFn: async () => {
+      if (!actor || !identity) return BigInt(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const actorAny = actor as any;
+      if (typeof actorAny.getLoyaltyPoints === "function") {
+        return actorAny.getLoyaltyPoints() as Promise<bigint>;
+      }
+      return BigInt(0);
+    },
+    enabled: !!actor && !!identity,
+  });
+
+  const loyaltyPoints = Number(loyaltyPointsRaw ?? BigInt(0));
+
+  // Build return request map
   const returnMap: Record<string, ReturnRequest> = {};
-  for (const rr of returnRequests) {
-    returnMap[rr.orderId] = rr;
-  }
-  // Overlay local optimistic state
-  for (const [orderId, rr] of Object.entries(localReturnRequests)) {
+  for (const rr of returnRequests) returnMap[rr.orderId] = rr;
+  for (const [orderId, rr] of Object.entries(localReturnRequests))
     returnMap[orderId] = rr;
-  }
 
   const handleSubmitReturn = useCallback(
     async (orderId: string, reason: string) => {
@@ -414,7 +535,6 @@ export default function Orders() {
         )) as ReturnRequest;
         setLocalReturnRequests((prev) => ({ ...prev, [orderId]: result }));
       } else {
-        // Optimistic local fallback until backend is wired
         const optimistic: ReturnRequest = {
           id: `local-${Date.now()}`,
           orderId,
@@ -430,14 +550,43 @@ export default function Orders() {
     [actor, identity],
   );
 
-  const orderList = (orders as Order[]).sort(
+  const allOrders = (orders as Order[]).sort(
     (a, b) => Number(b.timestamp) - Number(a.timestamp),
   );
+
   const productList = products as {
     id: string;
     title: string;
     image: { getDirectURL?: () => string };
   }[];
+
+  // Helper to extract status key string from variant object
+  function getStatusKey(order: Order): string {
+    return typeof order.status === "string"
+      ? order.status
+      : typeof order.status === "object" && order.status !== null
+        ? Object.keys(order.status as object)[0]
+        : String(order.status);
+  }
+
+  const filteredOrders = allOrders.filter((order) =>
+    matchesFilter(getStatusKey(order), activeFilter),
+  );
+
+  // Count per filter for badges
+  const countMap: Record<FilterTab, number> = {
+    all: allOrders.length,
+    active: allOrders.filter((o) => matchesFilter(getStatusKey(o), "active"))
+      .length,
+    delivered: allOrders.filter((o) =>
+      matchesFilter(getStatusKey(o), "delivered"),
+    ).length,
+    cancelled: allOrders.filter((o) =>
+      matchesFilter(getStatusKey(o), "cancelled"),
+    ).length,
+    returns: allOrders.filter((o) => matchesFilter(getStatusKey(o), "returns"))
+      .length,
+  };
 
   if (isLoading) {
     return (
@@ -450,59 +599,93 @@ export default function Orders() {
     );
   }
 
-  if (orderList.length === 0) {
-    return (
-      <div
-        style={{ background: "#f1f3f6" }}
-        className="min-h-screen flex flex-col items-center justify-center gap-4 px-4"
-      >
-        <div
-          className="bg-card rounded-sm shadow-sm p-12 flex flex-col items-center gap-4 max-w-sm w-full text-center"
-          data-ocid="orders-empty-state"
-        >
-          <Package className="w-20 h-20" style={{ color: "#2874f0" }} />
-          <h2 className="text-xl font-semibold text-foreground">
-            No orders yet
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Looks like you haven't placed any orders. Start shopping!
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            style={{ background: "#2874f0" }}
-            className="text-white font-medium px-10 py-2 rounded-sm hover:opacity-90 transition-opacity"
-            data-ocid="orders-shop-now-btn"
-          >
-            Shop Now
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ background: "#f1f3f6" }} className="min-h-screen">
       <div className="max-w-4xl mx-auto px-4 py-4">
-        {/* Header */}
+        {/* Page Header */}
         <div className="bg-card shadow-sm rounded-sm px-6 py-4 mb-4 flex items-center gap-3">
           <ShoppingBag className="w-5 h-5" style={{ color: "#2874f0" }} />
           <h1 className="text-lg font-semibold text-foreground">My Orders</h1>
           <span className="text-sm text-muted-foreground ml-1">
-            ({orderList.length})
+            ({allOrders.length})
           </span>
         </div>
 
+        {/* Loyalty Points Card */}
+        <LoyaltyCard points={loyaltyPoints} />
+
+        {/* Filter Tabs */}
+        <div
+          className="bg-card shadow-sm rounded-sm mb-4 flex overflow-x-auto"
+          data-ocid="orders-filter-tabs"
+        >
+          {FILTER_TABS.map((tab) => {
+            const isActive = activeFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveFilter(tab.key)}
+                className="flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap flex-shrink-0 transition-colors border-b-2"
+                style={{
+                  color: isActive ? "#2874f0" : "#616161",
+                  borderBottomColor: isActive ? "#2874f0" : "transparent",
+                  background: isActive ? "#f0f5ff" : "transparent",
+                }}
+                data-ocid={`orders-filter-${tab.key}`}
+              >
+                {tab.label}
+                {countMap[tab.key] > 0 && (
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                    style={{
+                      background: isActive ? "#2874f0" : "#e0e0e0",
+                      color: isActive ? "#fff" : "#616161",
+                    }}
+                  >
+                    {countMap[tab.key]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Empty filtered state */}
+        {filteredOrders.length === 0 && (
+          <div
+            className="bg-card shadow-sm rounded-sm p-12 flex flex-col items-center gap-4 text-center"
+            data-ocid="orders-empty-state"
+          >
+            <Package className="w-16 h-16" style={{ color: "#bdbdbd" }} />
+            <p className="text-base font-semibold text-foreground">
+              {allOrders.length === 0
+                ? "No orders yet"
+                : `No ${activeFilter} orders`}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {allOrders.length === 0
+                ? "You haven't placed any orders. Start shopping!"
+                : "Try selecting a different filter."}
+            </p>
+            {allOrders.length === 0 && (
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                style={{ background: "#2874f0" }}
+                className="text-white font-medium px-10 py-2 rounded-sm hover:opacity-90 transition-opacity mt-1"
+                data-ocid="orders-shop-now-btn"
+              >
+                Shop Now
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Orders List */}
         <div className="space-y-3">
-          {orderList.map((order) => {
-            const addr = parseAddress(order.deliveryAddress);
-            const statusKey =
-              typeof order.status === "string"
-                ? order.status
-                : typeof order.status === "object" && order.status !== null
-                  ? Object.keys(order.status as object)[0]
-                  : String(order.status);
+          {filteredOrders.map((order) => {
+            const statusKey = getStatusKey(order);
             const statusConfig = STATUS_MAP[statusKey] ?? {
               label: statusKey.toUpperCase(),
               bg: "#f5f5f5",
@@ -510,15 +693,11 @@ export default function Orders() {
               border: "#e0e0e0",
               stepIndex: 0,
             };
-            const orderDate = new Date(
-              Number(order.timestamp),
-            ).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            });
+            const addr = parseAddress(order.deliveryAddress);
             const isDelivered = statusKey === "delivered";
             const returnReq = returnMap[order.id];
+            const earnedPoints = calcPoints(order.totalAmount);
+            const shortId = order.id.slice(0, 8).toUpperCase();
 
             return (
               <div
@@ -527,53 +706,60 @@ export default function Orders() {
                 data-ocid={`order-card-${order.id}`}
               >
                 {/* Order Header */}
-                <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-6 text-sm">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Order ID
-                      </p>
-                      <p className="font-mono font-medium text-foreground">
-                        {order.id.slice(0, 8).toUpperCase()}
-                      </p>
+                <div className="px-6 py-4 border-b border-border">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    {/* Meta info */}
+                    <div className="flex flex-wrap gap-5">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                          Order ID
+                        </p>
+                        <p className="font-mono text-sm font-semibold text-foreground">
+                          #{shortId}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                          Placed On
+                        </p>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatDate(order.timestamp)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                          Total
+                        </p>
+                        <p className="text-sm font-bold text-foreground">
+                          ₹{(Number(order.totalAmount) / 100).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                          Payment
+                        </p>
+                        <p className="text-sm font-medium text-foreground capitalize">
+                          {typeof order.paymentMethod === "object"
+                            ? Object.keys(order.paymentMethod)[0].toUpperCase()
+                            : String(order.paymentMethod)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Date
-                      </p>
-                      <p className="font-medium text-foreground">{orderDate}</p>
+                    {/* Status badge + points */}
+                    <div className="flex flex-col items-end gap-2">
+                      <span
+                        className="px-3 py-1 rounded-sm text-xs font-semibold border"
+                        style={{
+                          background: statusConfig.bg,
+                          color: statusConfig.color,
+                          borderColor: statusConfig.border,
+                        }}
+                        data-ocid={`order-status-badge-${order.id}`}
+                      >
+                        {statusConfig.label}
+                      </span>
+                      <PointsBadge points={earnedPoints} />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Total
-                      </p>
-                      <p className="font-bold text-foreground">
-                        ₹{(Number(order.totalAmount) / 100).toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Payment
-                      </p>
-                      <p className="font-medium text-foreground capitalize">
-                        {typeof order.paymentMethod === "object"
-                          ? Object.keys(order.paymentMethod)[0]
-                          : String(order.paymentMethod)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div
-                    className="px-3 py-1 rounded-sm text-xs font-semibold border"
-                    style={{
-                      background: statusConfig.bg,
-                      color: statusConfig.color,
-                      borderColor: statusConfig.border,
-                    }}
-                    data-ocid={`order-status-badge-${order.id}`}
-                  >
-                    {statusConfig.label}
                   </div>
                 </div>
 
@@ -590,7 +776,8 @@ export default function Orders() {
                           className="flex items-center gap-4"
                           data-ocid={`order-item-${item.productId}`}
                         >
-                          <div className="w-14 h-14 bg-muted rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          {/* Product image */}
+                          <div className="w-14 h-14 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center border border-border bg-muted">
                             {product ? (
                               <img
                                 src={
@@ -609,16 +796,27 @@ export default function Orders() {
                               <Package className="w-6 h-6 text-muted-foreground" />
                             )}
                           </div>
+                          {/* Title + qty */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground line-clamp-1">
-                              {product?.title ?? item.productId}
+                            <p className="text-sm font-semibold text-foreground line-clamp-1">
+                              {product?.title ??
+                                `Product #${item.productId.slice(0, 6)}`}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              Qty: {Number(item.quantity)} · ₹
-                              {(Number(item.price) / 100).toLocaleString()} each
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">
+                                Qty: {Number(item.quantity)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                ·
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                ₹{(Number(item.price) / 100).toLocaleString()}{" "}
+                                each
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-sm font-semibold text-foreground flex-shrink-0">
+                          {/* Line total */}
+                          <p className="text-sm font-bold text-foreground flex-shrink-0">
                             ₹
                             {(
                               (Number(item.price) * Number(item.quantity)) /
@@ -633,14 +831,14 @@ export default function Orders() {
 
                 {/* Order Tracker */}
                 {statusKey !== "cancelled" && (
-                  <div className="px-6 pt-3 pb-1">
+                  <div className="px-6 pt-3 pb-2">
                     <OrderTracker status={statusKey} />
                   </div>
                 )}
 
                 {/* Delivery Address */}
                 {addr && (
-                  <div className="px-6 py-4 flex items-start gap-2 text-sm text-muted-foreground border-t border-border">
+                  <div className="px-6 py-3 flex items-start gap-2 border-t border-border">
                     <MapPin
                       className="w-4 h-4 flex-shrink-0 mt-0.5"
                       style={{ color: "#2874f0" }}

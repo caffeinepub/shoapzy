@@ -55,6 +55,7 @@ export interface Product {
   'title' : string,
   'description' : string,
   'discountPercent' : bigint,
+  'variants' : Array<ProductVariant>,
   'seller' : Principal,
   'isActive' : boolean,
   'stock' : bigint,
@@ -62,6 +63,17 @@ export interface Product {
   'image' : ExternalBlob,
   'price' : bigint,
 }
+export interface ProductVariant {
+  'id' : string,
+  'color' : [] | [string],
+  'size' : [] | [string],
+  'stock' : bigint,
+  'price' : [] | [number],
+}
+export type RedeemResult = {
+    'ok' : { 'discountAmount' : bigint, 'pointsUsed' : bigint }
+  } |
+  { 'err' : string };
 export interface ReturnRequest {
   'id' : string,
   'status' : ReturnStatus,
@@ -183,6 +195,11 @@ export interface _SERVICE {
   '_immutableObjectStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addProduct' : ActorMethod<[Product], undefined>,
+  'addProductVariant' : ActorMethod<
+    [string, ProductVariant],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'addReview' : ActorMethod<
     [string, bigint, string],
     { 'ok' : string } |
@@ -225,6 +242,7 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCallerWishlist' : ActorMethod<[], Array<string>>,
+  'getLoyaltyPoints' : ActorMethod<[], bigint>,
   'getMyReturnRequests' : ActorMethod<[], Array<ReturnRequest>>,
   'getOrderCommissionBreakdown' : ActorMethod<
     [string],
@@ -240,6 +258,7 @@ export interface _SERVICE {
   'getPlatformEarnings' : ActorMethod<[], bigint>,
   'getProductAverageRating' : ActorMethod<[string], number>,
   'getProductReviews' : ActorMethod<[string], Array<Review>>,
+  'getProductVariants' : ActorMethod<[string], Array<ProductVariant>>,
   'getProducts' : ActorMethod<[], Array<Product>>,
   'getReturnRequestByOrder' : ActorMethod<[string], [] | [ReturnRequest]>,
   'getReviewSummaries' : ActorMethod<[], Array<ReviewSummary>>,
@@ -259,6 +278,7 @@ export interface _SERVICE {
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'listCoupons' : ActorMethod<[], Array<CouponPublic>>,
   'placeOrder' : ActorMethod<[Order], undefined>,
+  'redeemLoyaltyPoints' : ActorMethod<[bigint, bigint], RedeemResult>,
   'registerAsSeller' : ActorMethod<[string, [] | [string]], undefined>,
   'rejectReturn' : ActorMethod<
     [string, [] | [string]],
@@ -279,6 +299,11 @@ export interface _SERVICE {
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateOrderStatus' : ActorMethod<[string, OrderStatus], undefined>,
   'updateProduct' : ActorMethod<[Product], undefined>,
+  'updateProductVariants' : ActorMethod<
+    [string, Array<ProductVariant>],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'updateSellerOrderStatus' : ActorMethod<
     [
       string,

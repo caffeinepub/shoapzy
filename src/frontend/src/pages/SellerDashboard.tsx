@@ -1,8 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   Edit,
   IndianRupee,
+  Layers,
   Package,
   Plus,
   ShoppingBag,
@@ -10,6 +13,7 @@ import {
   Tag,
   Trash2,
   Truck,
+  X,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +26,7 @@ import {
   ExternalBlob,
   type Order,
   type Product,
+  type ProductVariant,
   type ReturnRequest,
 } from "../types";
 
@@ -53,12 +58,253 @@ const RETURN_STATUS_COLORS: Record<string, string> = {
 
 type TabType = "products" | "orders" | "add";
 
-// Per-order status update state
 interface OrderUpdateState {
   loading: boolean;
   error: string | null;
 }
 
+interface VariantRow {
+  id: string;
+  size: string;
+  color: string;
+  stock: string;
+  price: string;
+}
+
+function emptyVariantRow(): VariantRow {
+  return { id: crypto.randomUUID(), size: "", color: "", stock: "", price: "" };
+}
+
+// ── Variant Manager Panel ──────────────────────────────────────────────────
+function VariantManager({
+  product,
+  actor,
+  onClose,
+}: {
+  product: Product;
+  actor: ReturnType<typeof useActor>["actor"];
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [rows, setRows] = useState<VariantRow[]>([emptyVariantRow()]);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load existing variants once
+  useQuery({
+    queryKey: ["productVariants", product.id],
+    queryFn: async () => {
+      const variants = (await (actor as any).getProductVariants(
+        product.id,
+      )) as ProductVariant[];
+      if (variants.length > 0) {
+        setRows(
+          variants.map((v) => ({
+            id: v.id,
+            size: v.size ?? "",
+            color: v.color ?? "",
+            stock: String(Number(v.stock)),
+            price: v.price !== null ? String(v.price) : "",
+          })),
+        );
+      }
+      setLoaded(true);
+      return variants;
+    },
+    enabled: !!actor && !loaded,
+  });
+
+  const updateRow = (id: string, field: keyof VariantRow, value: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
+    );
+  };
+
+  const removeRow = (id: string) => {
+    setRows((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      return next.length === 0 ? [emptyVariantRow()] : next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!actor) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const variants: ProductVariant[] = rows
+        .filter((r) => r.size.trim() || r.color.trim() || r.stock.trim())
+        .map((r) => ({
+          id: r.id,
+          size: r.size.trim() || null,
+          color: r.color.trim() || null,
+          stock: BigInt(Number.parseInt(r.stock) || 0),
+          price: r.price.trim() ? Number.parseFloat(r.price) : null,
+        }));
+      await (actor as any).setProductVariants(product.id, variants);
+      queryClient.invalidateQueries({
+        queryKey: ["productVariants", product.id],
+      });
+      setSaveMsg("Variants saved successfully!");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch (err) {
+      setSaveMsg(
+        err instanceof Error ? err.message : "Failed to save variants",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="border-t border-blue-100 bg-blue-50/40 px-5 py-4"
+      data-ocid="seller.variant_manager"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h4
+          className="text-sm font-bold flex items-center gap-2"
+          style={{ color: "#2874f0" }}
+        >
+          <Layers className="w-4 h-4" />
+          Manage Variants — {product.title}
+        </h4>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded hover:bg-blue-100 text-blue-400 transition-colors"
+          aria-label="Close variants"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Existing variants table */}
+      <div className="overflow-x-auto rounded-lg border border-blue-100 bg-white mb-3">
+        <table className="w-full text-xs">
+          <thead>
+            <tr
+              className="text-left border-b border-blue-100"
+              style={{ background: "#eef3ff" }}
+            >
+              <th className="px-3 py-2 font-semibold text-blue-700 w-[22%]">
+                Size
+              </th>
+              <th className="px-3 py-2 font-semibold text-blue-700 w-[22%]">
+                Color
+              </th>
+              <th className="px-3 py-2 font-semibold text-blue-700 w-[18%]">
+                Stock
+              </th>
+              <th className="px-3 py-2 font-semibold text-blue-700 w-[28%]">
+                Price Override (₹)
+              </th>
+              <th className="px-3 py-2 font-semibold text-blue-700 w-[10%]" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className="hover:bg-blue-50/30 transition-colors"
+              >
+                <td className="px-2 py-1.5">
+                  <Input
+                    value={row.size}
+                    onChange={(e) => updateRow(row.id, "size", e.target.value)}
+                    placeholder="S / M / L / XL"
+                    className="h-7 text-xs border-gray-200 min-w-0"
+                    data-ocid="seller.variant.size_input"
+                  />
+                </td>
+                <td className="px-2 py-1.5">
+                  <Input
+                    value={row.color}
+                    onChange={(e) => updateRow(row.id, "color", e.target.value)}
+                    placeholder="Red / Blue"
+                    className="h-7 text-xs border-gray-200 min-w-0"
+                    data-ocid="seller.variant.color_input"
+                  />
+                </td>
+                <td className="px-2 py-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={row.stock}
+                    onChange={(e) => updateRow(row.id, "stock", e.target.value)}
+                    placeholder="0"
+                    className="h-7 text-xs border-gray-200 min-w-0"
+                    data-ocid="seller.variant.stock_input"
+                  />
+                </td>
+                <td className="px-2 py-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={row.price}
+                    onChange={(e) => updateRow(row.id, "price", e.target.value)}
+                    placeholder="Leave blank to use product price"
+                    className="h-7 text-xs border-gray-200 min-w-0"
+                    data-ocid="seller.variant.price_input"
+                  />
+                </td>
+                <td className="px-2 py-1.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(row.id)}
+                    className="p-1 rounded hover:bg-red-50 text-red-400 transition-colors"
+                    aria-label="Remove variant"
+                    data-ocid="seller.variant.remove"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setRows((prev) => [...prev, emptyVariantRow()])}
+          className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors px-3 py-1.5 border border-blue-200 rounded bg-white hover:bg-blue-50"
+          data-ocid="seller.variant.add_row"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Variant
+        </button>
+        <Button
+          size="sm"
+          disabled={saving}
+          onClick={handleSave}
+          className="text-white text-xs font-semibold h-8 px-4"
+          style={{ background: "#2874f0" }}
+          data-ocid="seller.variant.save"
+        >
+          {saving ? "Saving..." : "Save Variants"}
+        </Button>
+        {saveMsg && (
+          <span
+            className={`text-xs font-medium px-2 py-1 rounded ${
+              saveMsg.includes("success")
+                ? "text-green-700 bg-green-50"
+                : "text-red-600 bg-red-50"
+            }`}
+          >
+            {saveMsg}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
 export default function SellerDashboard() {
   const { actor } = useActor();
   const { identity } = useInternetIdentity();
@@ -80,6 +326,10 @@ export default function SellerDashboard() {
   const [orderUpdateState, setOrderUpdateState] = useState<
     Record<string, OrderUpdateState>
   >({});
+  // Track which product's variant panel is open
+  const [openVariantProductId, setOpenVariantProductId] = useState<
+    string | null
+  >(null);
 
   const principalStr = identity?.getPrincipal().toString();
   const enabled = !!actor && !!identity;
@@ -108,7 +358,6 @@ export default function SellerDashboard() {
     enabled,
   });
 
-  // Batch fetch return requests for all orders
   const { data: returnRequests = {} } = useQuery({
     queryKey: [
       "sellerReturnRequests",
@@ -294,6 +543,7 @@ export default function SellerDashboard() {
     await actor.deleteProduct(productId);
     queryClient.invalidateQueries({ queryKey: ["sellerProducts"] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
+    if (openVariantProductId === productId) setOpenVariantProductId(null);
   };
 
   const handleEdit = (product: Product) => {
@@ -466,88 +716,126 @@ export default function SellerDashboard() {
                         <th className="pb-3 font-semibold">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody>
                       {(products as Product[]).map((product, i) => (
-                        <tr
-                          key={product.id}
-                          className="hover:bg-gray-50 transition-colors"
-                          data-ocid={`seller.product.${i + 1}`}
-                        >
-                          <td className="py-3 pr-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={product.image.getDirectURL()}
-                                alt={product.title}
-                                className="w-10 h-10 object-cover rounded border border-gray-100"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "/placeholder.png";
-                                }}
-                              />
-                              <div>
-                                <p className="font-medium text-gray-800 truncate max-w-[150px]">
-                                  {product.title}
-                                </p>
-                                <p className="text-xs text-gray-400 truncate max-w-[150px]">
-                                  {product.description}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded font-medium">
-                              {product.category}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 text-gray-400 line-through text-xs">
-                            ₹{(Number(product.mrp) / 100).toLocaleString()}
-                          </td>
-                          <td className="py-3 pr-4">
-                            {Number(product.discountPercent) > 0 && (
-                              <span className="flex items-center gap-1 text-green-600 font-semibold text-xs">
-                                <Tag className="w-3 h-3" />
-                                {Number(product.discountPercent)}% off
-                              </span>
-                            )}
-                          </td>
-                          <td
-                            className="py-3 pr-4 font-bold"
-                            style={{ color: "#2874f0" }}
+                        <>
+                          <tr
+                            key={product.id}
+                            className="hover:bg-gray-50 transition-colors border-b border-gray-50"
+                            data-ocid={`seller.product.${i + 1}`}
                           >
-                            ₹{(Number(product.price) / 100).toLocaleString()}
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span
-                              className={
-                                Number(product.stock) > 0
-                                  ? "text-green-600 font-medium"
-                                  : "text-red-500 font-medium"
-                              }
+                            <td className="py-3 pr-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={product.image.getDirectURL()}
+                                  alt={product.title}
+                                  className="w-10 h-10 object-cover rounded border border-gray-100"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src =
+                                      "/placeholder.png";
+                                  }}
+                                />
+                                <div>
+                                  <p className="font-medium text-gray-800 truncate max-w-[150px]">
+                                    {product.title}
+                                  </p>
+                                  <p className="text-xs text-gray-400 truncate max-w-[150px]">
+                                    {product.description}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded font-medium">
+                                {product.category}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-gray-400 line-through text-xs">
+                              ₹{(Number(product.mrp) / 100).toLocaleString()}
+                            </td>
+                            <td className="py-3 pr-4">
+                              {Number(product.discountPercent) > 0 && (
+                                <span className="flex items-center gap-1 text-green-600 font-semibold text-xs">
+                                  <Tag className="w-3 h-3" />
+                                  {Number(product.discountPercent)}% off
+                                </span>
+                              )}
+                            </td>
+                            <td
+                              className="py-3 pr-4 font-bold"
+                              style={{ color: "#2874f0" }}
                             >
-                              {Number(product.stock)}
-                            </span>
-                          </td>
-                          <td className="py-3">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEdit(product)}
-                                className="p-1.5 rounded hover:bg-blue-50 text-blue-500 transition-colors"
-                                aria-label="Edit product"
+                              ₹{(Number(product.price) / 100).toLocaleString()}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span
+                                className={
+                                  Number(product.stock) > 0
+                                    ? "text-green-600 font-medium"
+                                    : "text-red-500 font-medium"
+                                }
                               >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(product.id)}
-                                className="p-1.5 rounded hover:bg-red-50 text-red-400 transition-colors"
-                                aria-label="Delete product"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                                {Number(product.stock)}
+                              </span>
+                            </td>
+                            <td className="py-3">
+                              <div className="flex gap-1 items-center">
+                                {/* Manage Variants toggle */}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setOpenVariantProductId((prev) =>
+                                      prev === product.id ? null : product.id,
+                                    )
+                                  }
+                                  title="Manage Variants"
+                                  className={`p-1.5 rounded transition-colors flex items-center gap-1 text-xs font-semibold ${
+                                    openVariantProductId === product.id
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "hover:bg-blue-50 text-blue-400"
+                                  }`}
+                                  data-ocid={`seller.product.${i + 1}.variants_toggle`}
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
+                                  {openVariantProductId === product.id ? (
+                                    <ChevronUp className="w-3 h-3" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEdit(product)}
+                                  className="p-1.5 rounded hover:bg-blue-50 text-blue-500 transition-colors"
+                                  aria-label="Edit product"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(product.id)}
+                                  className="p-1.5 rounded hover:bg-red-50 text-red-400 transition-colors"
+                                  aria-label="Delete product"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Inline Variant Manager panel */}
+                          {openVariantProductId === product.id && actor && (
+                            <tr key={`${product.id}-variants`}>
+                              <td colSpan={7} className="p-0">
+                                <VariantManager
+                                  product={product}
+                                  actor={actor}
+                                  onClose={() => setOpenVariantProductId(null)}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       ))}
                     </tbody>
                   </table>
@@ -597,7 +885,10 @@ export default function SellerDashboard() {
                       id="p-desc"
                       value={form.description}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, description: e.target.value }))
+                        setForm((f) => ({
+                          ...f,
+                          description: e.target.value,
+                        }))
                       }
                       rows={3}
                       required
@@ -825,7 +1116,6 @@ export default function SellerDashboard() {
                         data-ocid={`seller.order.${i + 1}`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          {/* Order info */}
                           <div className="flex items-center gap-4 min-w-0">
                             <div className="min-w-0">
                               <p className="font-mono text-xs text-gray-400">
@@ -849,16 +1139,13 @@ export default function SellerDashboard() {
                             </div>
                           </div>
 
-                          {/* Status + actions */}
                           <div className="flex flex-col items-end gap-2">
-                            {/* Current status badge */}
                             <span
                               className={`text-xs font-semibold px-2.5 py-1 rounded border ${statusClass}`}
                             >
                               {statusKey.toUpperCase()}
                             </span>
 
-                            {/* Return request badge */}
                             {returnReq && (
                               <span
                                 className={`text-xs font-semibold px-2.5 py-1 rounded border ${
@@ -873,7 +1160,6 @@ export default function SellerDashboard() {
                               </span>
                             )}
 
-                            {/* Status update button */}
                             {statusKey === "approved" && (
                               <Button
                                 size="sm"
@@ -909,7 +1195,6 @@ export default function SellerDashboard() {
                               </Button>
                             )}
 
-                            {/* Inline error */}
                             {updateState.error && (
                               <p
                                 className="text-xs text-red-500 text-right max-w-[200px]"

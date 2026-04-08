@@ -14,28 +14,10 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
-export interface Product {
-    id: string;
-    mrp: bigint;
-    title: string;
-    description: string;
-    discountPercent: bigint;
-    seller: Principal;
-    isActive: boolean;
-    stock: bigint;
-    category: string;
-    image: ExternalBlob;
-    price: bigint;
-}
 export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
-}
-export interface SellerRegistration {
-    principal: Principal;
-    shopDescription?: string;
-    shopName: string;
 }
 export interface SellerProfileData {
     principal: Principal;
@@ -44,12 +26,6 @@ export interface SellerProfileData {
     averageRating: number;
     shopName: string;
     totalReviews: bigint;
-}
-export interface SellerInfo {
-    status: string;
-    principal: Principal;
-    shopDescription?: string;
-    shopName: string;
 }
 export interface ReturnRequest {
     id: string;
@@ -60,45 +36,6 @@ export interface ReturnRequest {
     timestamp: bigint;
     reason: string;
 }
-export interface http_header {
-    value: string;
-    name: string;
-}
-export interface http_request_result {
-    status: bigint;
-    body: Uint8Array;
-    headers: Array<http_header>;
-}
-export interface UserApprovalInfo {
-    status: ApprovalStatus;
-    principal: Principal;
-}
-export interface ShoppingItem {
-    productName: string;
-    currency: string;
-    quantity: bigint;
-    priceInCents: bigint;
-    productDescription: string;
-}
-export interface ReviewSummary {
-    productId: string;
-    averageRating: number;
-    reviewCount: bigint;
-}
-export interface Order {
-    id: string;
-    status: OrderStatus;
-    deliveryAddress?: string;
-    paymentMethod: Variant_cod_online;
-    totalAmount: bigint;
-    timestamp: bigint;
-    buyer: Principal;
-    items: Array<CartItem>;
-}
-export interface TransformationInput {
-    context: Uint8Array;
-    response: http_request_result;
-}
 export interface CouponPublic {
     validFrom: bigint;
     code: string;
@@ -108,6 +45,25 @@ export interface CouponPublic {
     isActive: boolean;
     usageLimit: bigint;
 }
+export interface ReviewSummary {
+    productId: string;
+    averageRating: number;
+    reviewCount: bigint;
+}
+export interface TransformationInput {
+    context: Uint8Array;
+    response: http_request_result;
+}
+export type RedeemResult = {
+    __kind__: "ok";
+    ok: {
+        discountAmount: bigint;
+        pointsUsed: bigint;
+    };
+} | {
+    __kind__: "err";
+    err: string;
+};
 export type StripeSessionStatus = {
     __kind__: "completed";
     completed: {
@@ -124,19 +80,6 @@ export interface StripeConfiguration {
     allowedCountries: Array<string>;
     secretKey: string;
 }
-export interface CartItem {
-    productId: string;
-    seller: Principal;
-    quantity: bigint;
-    price: bigint;
-}
-export interface UserProfile {
-    shopDescription?: string;
-    name: string;
-    role: string;
-    sellerApproved: boolean;
-    shopName?: string;
-}
 export interface Review {
     id: bigint;
     reviewText: string;
@@ -146,10 +89,80 @@ export interface Review {
     rating: bigint;
     buyerName: string;
 }
-export enum ApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
+export interface SellerRegistration {
+    principal: Principal;
+    shopDescription?: string;
+    shopName: string;
+}
+export interface SellerInfo {
+    status: string;
+    principal: Principal;
+    shopDescription?: string;
+    shopName: string;
+}
+export interface ProductVariant {
+    id: string;
+    color?: string;
+    size?: string;
+    stock: bigint;
+    price?: number;
+}
+export interface http_header {
+    value: string;
+    name: string;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface Order {
+    id: string;
+    status: OrderStatus;
+    deliveryAddress?: string;
+    paymentMethod: Variant_cod_online;
+    totalAmount: bigint;
+    timestamp: bigint;
+    buyer: Principal;
+    items: Array<CartItem>;
+}
+export interface UserApprovalInfo {
+    status: ApprovalStatus;
+    principal: Principal;
+}
+export interface ShoppingItem {
+    productName: string;
+    currency: string;
+    quantity: bigint;
+    priceInCents: bigint;
+    productDescription: string;
+}
+export interface CartItem {
+    productId: string;
+    seller: Principal;
+    quantity: bigint;
+    price: bigint;
+}
+export interface Product {
+    id: string;
+    mrp: bigint;
+    title: string;
+    description: string;
+    discountPercent: bigint;
+    variants: Array<ProductVariant>;
+    seller: Principal;
+    isActive: boolean;
+    stock: bigint;
+    category: string;
+    image: ExternalBlob;
+    price: bigint;
+}
+export interface UserProfile {
+    shopDescription?: string;
+    name: string;
+    role: string;
+    sellerApproved: boolean;
+    shopName?: string;
 }
 export enum OrderStatus {
     shipped = "shipped",
@@ -162,6 +175,11 @@ export enum OrderStatus {
     delivered = "delivered",
     return_rejected = "return_rejected"
 }
+export enum ReturnStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -173,6 +191,13 @@ export enum Variant_cod_online {
 }
 export interface backendInterface {
     addProduct(product: Product): Promise<void>;
+    addProductVariant(productId: string, variant: ProductVariant): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     addReview(productId: string, rating: bigint, reviewText: string): Promise<{
         __kind__: "ok";
         ok: string;
@@ -226,6 +251,7 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCallerWishlist(): Promise<Array<string>>;
+    getLoyaltyPoints(): Promise<bigint>;
     getMyReturnRequests(): Promise<Array<ReturnRequest>>;
     getOrderCommissionBreakdown(orderId: string): Promise<{
         adminCommission: bigint;
@@ -236,6 +262,7 @@ export interface backendInterface {
     getPlatformEarnings(): Promise<bigint>;
     getProductAverageRating(productId: string): Promise<number>;
     getProductReviews(productId: string): Promise<Array<Review>>;
+    getProductVariants(productId: string): Promise<Array<ProductVariant>>;
     getProducts(): Promise<Array<Product>>;
     getReturnRequestByOrder(orderId: string): Promise<ReturnRequest | null>;
     getReviewSummaries(): Promise<Array<ReviewSummary>>;
@@ -255,6 +282,7 @@ export interface backendInterface {
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     listCoupons(): Promise<Array<CouponPublic>>;
     placeOrder(order: Order): Promise<void>;
+    redeemLoyaltyPoints(pointsToRedeem: bigint, orderTotal: bigint): Promise<RedeemResult>;
     registerAsSeller(shopName: string, shopDescription: string | null): Promise<void>;
     rejectReturn(requestId: string, adminComment: string | null): Promise<{
         __kind__: "ok";
@@ -279,6 +307,13 @@ export interface backendInterface {
     transform(input: TransformationInput): Promise<TransformationOutput>;
     updateOrderStatus(orderId: string, status: OrderStatus): Promise<void>;
     updateProduct(product: Product): Promise<void>;
+    updateProductVariants(productId: string, variants: Array<ProductVariant>): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     updateSellerOrderStatus(orderId: string, newStatus: OrderStatus): Promise<{
         __kind__: "ok";
         ok: null;

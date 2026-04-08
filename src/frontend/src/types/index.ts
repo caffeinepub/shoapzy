@@ -31,6 +31,7 @@ export interface Product {
   isActive: boolean;
   seller: Principal;
   image: ExternalBlob;
+  variants?: ProductVariant[];
 }
 
 export interface CartItem {
@@ -110,4 +111,12 @@ export interface ReturnRequest {
   status: ReturnRequestStatus;
   timestamp: bigint;
   adminComment: string | null;
+}
+
+export interface ProductVariant {
+  id: string;
+  size: string | null;
+  color: string | null;
+  stock: bigint;
+  price: number | null;
 }

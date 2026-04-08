@@ -1,5 +1,5 @@
 import type { backendInterface, _ImmutableObjectStorageCreateCertificateResult, _ImmutableObjectStorageRefillResult } from "../backend";
-import { ApprovalStatus, OrderStatus, UserRole, Variant_cod_online } from "../backend";
+import { OrderStatus, ReturnStatus, UserRole, Variant_cod_online } from "../backend";
 import { Principal } from "@icp-sdk/core/principal";
 import { ExternalBlob } from "../backend";
 
@@ -17,6 +17,7 @@ const sampleProduct = {
   price: BigInt(1499),
   mrp: BigInt(1999),
   discountPercent: BigInt(25),
+  variants: [],
 };
 
 const sampleProduct2 = {
@@ -31,6 +32,7 @@ const sampleProduct2 = {
   price: BigInt(599),
   mrp: BigInt(799),
   discountPercent: BigInt(25),
+  variants: [],
 };
 
 export const mockBackend: backendInterface = {
@@ -115,7 +117,7 @@ export const mockBackend: backendInterface = {
   getMyReturnRequests: async () => [],
   getReturnRequestByOrder: async () => null,
   rejectReturn: async () => ({ __kind__: "ok" as const, ok: null }),
-  submitReturnRequest: async () => ({ __kind__: "ok" as const, ok: { id: "mock-return-id", status: "pending" as const, orderId: "mock-order-id", adminComment: undefined, buyerId: samplePrincipal, timestamp: BigInt(0), reason: "mock reason" } }),
+  submitReturnRequest: async () => ({ __kind__: "ok" as const, ok: { id: "mock-return-id", status: ReturnStatus.pending, orderId: "mock-order-id", adminComment: undefined, buyerId: samplePrincipal, timestamp: BigInt(0), reason: "mock reason" } }),
   updateSellerOrderStatus: async () => ({ __kind__: "ok" as const, ok: null }),
   applyCoupon: async () => ({ __kind__: "ok" as const, ok: null }),
   createCoupon: async () => ({ __kind__: "ok" as const, ok: { code: "SAVE10", discountPercent: BigInt(10), validFrom: BigInt(0), validTo: BigInt(Date.now() + 86400000), usageLimit: BigInt(100), usedCount: BigInt(0), isActive: true } }),
@@ -125,4 +127,9 @@ export const mockBackend: backendInterface = {
   validateCoupon: async () => ({ __kind__: "ok" as const, ok: BigInt(10) }),
   getSellerProfileData: async () => null,
   getSellerReviews: async () => [],
+  getLoyaltyPoints: async () => BigInt(0),
+  redeemLoyaltyPoints: async () => ({ __kind__: "ok" as const, ok: { discountAmount: BigInt(0), pointsUsed: BigInt(0) } }),
+  getProductVariants: async () => [],
+  addProductVariant: async () => ({ __kind__: "ok" as const, ok: null }),
+  updateProductVariants: async () => ({ __kind__: "ok" as const, ok: null }),
 };

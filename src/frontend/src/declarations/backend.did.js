@@ -19,6 +19,13 @@ export const _ImmutableObjectStorageRefillResult = IDL.Record({
   'success' : IDL.Opt(IDL.Bool),
   'topped_up_amount' : IDL.Opt(IDL.Nat),
 });
+export const ProductVariant = IDL.Record({
+  'id' : IDL.Text,
+  'color' : IDL.Opt(IDL.Text),
+  'size' : IDL.Opt(IDL.Text),
+  'stock' : IDL.Nat,
+  'price' : IDL.Opt(IDL.Float64),
+});
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const Product = IDL.Record({
   'id' : IDL.Text,
@@ -26,6 +33,7 @@ export const Product = IDL.Record({
   'title' : IDL.Text,
   'description' : IDL.Text,
   'discountPercent' : IDL.Nat,
+  'variants' : IDL.Vec(ProductVariant),
   'seller' : IDL.Principal,
   'isActive' : IDL.Bool,
   'stock' : IDL.Nat,
@@ -151,6 +159,10 @@ export const UserApprovalInfo = IDL.Record({
   'status' : ApprovalStatus,
   'principal' : IDL.Principal,
 });
+export const RedeemResult = IDL.Variant({
+  'ok' : IDL.Record({ 'discountAmount' : IDL.Nat, 'pointsUsed' : IDL.Nat }),
+  'err' : IDL.Text,
+});
 export const StripeConfiguration = IDL.Record({
   'allowedCountries' : IDL.Vec(IDL.Text),
   'secretKey' : IDL.Text,
@@ -203,6 +215,11 @@ export const idlService = IDL.Service({
   '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControl' : IDL.Func([], [], []),
   'addProduct' : IDL.Func([Product], [], []),
+  'addProductVariant' : IDL.Func(
+      [IDL.Text, ProductVariant],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'addReview' : IDL.Func(
       [IDL.Text, IDL.Nat, IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -250,6 +267,7 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getLoyaltyPoints' : IDL.Func([], [IDL.Nat], ['query']),
   'getMyReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
   'getOrderCommissionBreakdown' : IDL.Func(
       [IDL.Text],
@@ -276,6 +294,11 @@ export const idlService = IDL.Service({
   'getPlatformEarnings' : IDL.Func([], [IDL.Nat], ['query']),
   'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
+  'getProductVariants' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(ProductVariant)],
+      ['query'],
+    ),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'getReturnRequestByOrder' : IDL.Func(
       [IDL.Text],
@@ -315,6 +338,7 @@ export const idlService = IDL.Service({
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'listCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
   'placeOrder' : IDL.Func([Order], [], []),
+  'redeemLoyaltyPoints' : IDL.Func([IDL.Nat, IDL.Nat], [RedeemResult], []),
   'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
   'rejectReturn' : IDL.Func(
       [IDL.Text, IDL.Opt(IDL.Text)],
@@ -339,6 +363,11 @@ export const idlService = IDL.Service({
     ),
   'updateOrderStatus' : IDL.Func([IDL.Text, OrderStatus], [], []),
   'updateProduct' : IDL.Func([Product], [], []),
+  'updateProductVariants' : IDL.Func(
+      [IDL.Text, IDL.Vec(ProductVariant)],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'updateSellerOrderStatus' : IDL.Func(
       [
         IDL.Text,
@@ -378,6 +407,13 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
+  const ProductVariant = IDL.Record({
+    'id' : IDL.Text,
+    'color' : IDL.Opt(IDL.Text),
+    'size' : IDL.Opt(IDL.Text),
+    'stock' : IDL.Nat,
+    'price' : IDL.Opt(IDL.Float64),
+  });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Product = IDL.Record({
     'id' : IDL.Text,
@@ -385,6 +421,7 @@ export const idlFactory = ({ IDL }) => {
     'title' : IDL.Text,
     'description' : IDL.Text,
     'discountPercent' : IDL.Nat,
+    'variants' : IDL.Vec(ProductVariant),
     'seller' : IDL.Principal,
     'isActive' : IDL.Bool,
     'stock' : IDL.Nat,
@@ -510,6 +547,10 @@ export const idlFactory = ({ IDL }) => {
     'status' : ApprovalStatus,
     'principal' : IDL.Principal,
   });
+  const RedeemResult = IDL.Variant({
+    'ok' : IDL.Record({ 'discountAmount' : IDL.Nat, 'pointsUsed' : IDL.Nat }),
+    'err' : IDL.Text,
+  });
   const StripeConfiguration = IDL.Record({
     'allowedCountries' : IDL.Vec(IDL.Text),
     'secretKey' : IDL.Text,
@@ -559,6 +600,11 @@ export const idlFactory = ({ IDL }) => {
     '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControl' : IDL.Func([], [], []),
     'addProduct' : IDL.Func([Product], [], []),
+    'addProductVariant' : IDL.Func(
+        [IDL.Text, ProductVariant],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'addReview' : IDL.Func(
         [IDL.Text, IDL.Nat, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -606,6 +652,7 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getLoyaltyPoints' : IDL.Func([], [IDL.Nat], ['query']),
     'getMyReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
     'getOrderCommissionBreakdown' : IDL.Func(
         [IDL.Text],
@@ -632,6 +679,11 @@ export const idlFactory = ({ IDL }) => {
     'getPlatformEarnings' : IDL.Func([], [IDL.Nat], ['query']),
     'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
+    'getProductVariants' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(ProductVariant)],
+        ['query'],
+      ),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'getReturnRequestByOrder' : IDL.Func(
         [IDL.Text],
@@ -675,6 +727,7 @@ export const idlFactory = ({ IDL }) => {
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'listCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
     'placeOrder' : IDL.Func([Order], [], []),
+    'redeemLoyaltyPoints' : IDL.Func([IDL.Nat, IDL.Nat], [RedeemResult], []),
     'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
     'rejectReturn' : IDL.Func(
         [IDL.Text, IDL.Opt(IDL.Text)],
@@ -699,6 +752,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'updateOrderStatus' : IDL.Func([IDL.Text, OrderStatus], [], []),
     'updateProduct' : IDL.Func([Product], [], []),
+    'updateProductVariants' : IDL.Func(
+        [IDL.Text, IDL.Vec(ProductVariant)],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'updateSellerOrderStatus' : IDL.Func(
         [
           IDL.Text,
