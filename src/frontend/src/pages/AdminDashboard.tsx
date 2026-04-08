@@ -7,16 +7,22 @@ import {
   ChevronRight,
   IndianRupee,
   Package,
+  PlusCircle,
   RefreshCw,
   RotateCcw,
   ShoppingBag,
   Store,
+  Tag,
   TrendingUp,
   Users,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { CouponPublic } from "../backend";
+import { Button } from "../components/ui/button";
+import { useActor } from "../hooks/useActor";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   type Order,
   OrderStatus,
@@ -40,10 +46,6 @@ interface SellerInfo {
   shopName: string;
   status: string;
 }
-
-import { Button } from "../components/ui/button";
-import { useActor } from "../hooks/useActor";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const ORDER_STATUSES = [
   OrderStatus.pending,
@@ -86,8 +88,12 @@ function SellerProductsRow({
     if (!expanded && !fetched) {
       setLoading(true);
       try {
-        const result = await (actor as any).getSellerProducts(seller.principal);
-        setProducts(result as Product[]);
+        const result = await (
+          actor as ReturnType<typeof useActor>["actor"] & {
+            getSellerProducts: (p: Principal) => Promise<Product[]>;
+          }
+        )?.getSellerProducts(seller.principal);
+        setProducts((result ?? []) as Product[]);
         setFetched(true);
       } catch (e) {
         console.error(e);
@@ -237,7 +243,357 @@ const RETURN_STATUS_BADGE: Record<string, string> = {
   rejected: "bg-red-100 text-red-700 border border-red-200",
 };
 
-type AdminTab = "sellers" | "allSellers" | "orders" | "earnings" | "returns";
+const TODAY_STR = new Date().toISOString().split("T")[0];
+
+function CouponsTab({
+  actor,
+  enabled,
+}: { actor: ReturnType<typeof useActor>["actor"]; enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const [formCode, setFormCode] = useState("");
+  const [formDiscount, setFormDiscount] = useState("");
+  const [formValidFrom, setFormValidFrom] = useState(TODAY_STR ?? "");
+  const [formValidTo, setFormValidTo] = useState("");
+  const [formUsageLimit, setFormUsageLimit] = useState("100");
+  const [creating, setCreating] = useState(false);
+  const [deactivatingCode, setDeactivatingCode] = useState<string | null>(null);
+
+  const { data: coupons = [], isLoading } = useQuery<CouponPublic[]>({
+    queryKey: ["adminCoupons"],
+    queryFn: () => actor!.listCoupons(),
+    enabled,
+  });
+
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!actor) return;
+    const discount = Number(formDiscount);
+    const usageLimit = Number(formUsageLimit);
+    if (
+      !formCode.trim() ||
+      discount < 1 ||
+      discount > 100 ||
+      !formValidFrom ||
+      !formValidTo ||
+      usageLimit < 1
+    ) {
+      toast.error("Please fill all fields correctly.");
+      return;
+    }
+    const validFromMs = BigInt(new Date(formValidFrom).getTime());
+    const validToMs = BigInt(new Date(formValidTo).getTime());
+    if (validToMs <= validFromMs) {
+      toast.error("Valid To date must be after Valid From date.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const result = await actor.createCoupon(
+        formCode.trim().toUpperCase(),
+        BigInt(discount),
+        validFromMs,
+        validToMs,
+        BigInt(usageLimit),
+      );
+      if (result.__kind === "ok") {
+        toast.success(
+          `Coupon "${formCode.toUpperCase()}" created successfully!`,
+        );
+        setFormCode("");
+        setFormDiscount("");
+        setFormValidTo("");
+        setFormUsageLimit("100");
+        queryClient.invalidateQueries({ queryKey: ["adminCoupons"] });
+      } else {
+        toast.error(result.err);
+      }
+    } catch {
+      toast.error("Failed to create coupon. Please try again.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeactivate = async (code: string) => {
+    if (!actor) return;
+    setDeactivatingCode(code);
+    try {
+      const result = await actor.deactivateCoupon(code);
+      if (result.__kind === "ok") {
+        toast.success(`Coupon "${code}" deactivated.`);
+        queryClient.invalidateQueries({ queryKey: ["adminCoupons"] });
+      } else {
+        toast.error(result.err);
+      }
+    } catch {
+      toast.error("Failed to deactivate coupon.");
+    } finally {
+      setDeactivatingCode(null);
+    }
+  };
+
+  const formatDate = (ms: bigint) =>
+    new Date(Number(ms)).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+  return (
+    <div className="p-5">
+      {/* Create Coupon Form */}
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <PlusCircle className="w-4 h-4" style={{ color: "#2874f0" }} />
+          <h3 className="font-semibold text-sm" style={{ color: "#2874f0" }}>
+            Create New Coupon
+          </h3>
+        </div>
+        <form
+          onSubmit={handleCreateCoupon}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+        >
+          <div>
+            <label
+              htmlFor="coupon-code"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Coupon Code *
+            </label>
+            <input
+              id="coupon-code"
+              type="text"
+              value={formCode}
+              onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+              placeholder="e.g. SAVE20"
+              required
+              maxLength={20}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 uppercase font-mono font-bold"
+              data-ocid="coupon-form-code"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="coupon-discount"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Discount % (1–100) *
+            </label>
+            <input
+              id="coupon-discount"
+              type="number"
+              value={formDiscount}
+              onChange={(e) => setFormDiscount(e.target.value)}
+              placeholder="e.g. 20"
+              required
+              min={1}
+              max={100}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              data-ocid="coupon-form-discount"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="coupon-usage-limit"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Usage Limit *
+            </label>
+            <input
+              id="coupon-usage-limit"
+              type="number"
+              value={formUsageLimit}
+              onChange={(e) => setFormUsageLimit(e.target.value)}
+              placeholder="100"
+              required
+              min={1}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              data-ocid="coupon-form-usage-limit"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="coupon-valid-from"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Valid From *
+            </label>
+            <input
+              id="coupon-valid-from"
+              type="date"
+              value={formValidFrom}
+              onChange={(e) => setFormValidFrom(e.target.value)}
+              required
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              data-ocid="coupon-form-valid-from"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="coupon-valid-to"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Valid To *
+            </label>
+            <input
+              id="coupon-valid-to"
+              type="date"
+              value={formValidTo}
+              onChange={(e) => setFormValidTo(e.target.value)}
+              required
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              data-ocid="coupon-form-valid-to"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={creating}
+              style={{ background: "#2874f0" }}
+              className="w-full text-white font-semibold px-5 py-2 rounded text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              data-ocid="coupon-create-btn"
+            >
+              <PlusCircle className="w-4 h-4" />
+              {creating ? "Creating..." : "Create Coupon"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Coupons Table */}
+      {isLoading ? (
+        <div
+          className="text-center py-12 text-gray-400"
+          data-ocid="coupons.loading_state"
+        >
+          <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-gray-300" />
+          Loading coupons...
+        </div>
+      ) : coupons.length === 0 ? (
+        <div className="text-center py-16" data-ocid="coupons.empty_state">
+          <Tag className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-400 font-medium">No coupons created yet</p>
+          <p className="text-gray-400 text-sm mt-1">
+            Create your first coupon using the form above
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                <th className="pb-3 pr-4 font-semibold">Code</th>
+                <th className="pb-3 pr-4 font-semibold">Discount</th>
+                <th className="pb-3 pr-4 font-semibold">Valid From</th>
+                <th className="pb-3 pr-4 font-semibold">Valid To</th>
+                <th className="pb-3 pr-4 font-semibold">Usage</th>
+                <th className="pb-3 pr-4 font-semibold">Status</th>
+                <th className="pb-3 font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {(coupons as CouponPublic[]).map((coupon, idx) => {
+                const isExpired = Number(coupon.validTo) < Date.now();
+                const isExhausted =
+                  Number(coupon.usedCount) >= Number(coupon.usageLimit);
+                const statusLabel = !coupon.isActive
+                  ? "Inactive"
+                  : isExpired
+                    ? "Expired"
+                    : isExhausted
+                      ? "Exhausted"
+                      : "Active";
+                const statusClass =
+                  !coupon.isActive || isExpired || isExhausted
+                    ? "bg-red-50 text-red-600 border-red-100"
+                    : "bg-green-50 text-green-700 border-green-100";
+                return (
+                  <tr
+                    key={coupon.code}
+                    className="hover:bg-gray-50 transition-colors"
+                    data-ocid={`coupons.item.${idx + 1}`}
+                  >
+                    <td className="py-3 pr-4">
+                      <span className="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded text-xs tracking-wide">
+                        {coupon.code}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span className="font-bold text-orange-600 text-base">
+                        {Number(coupon.discountPercent)}%
+                      </span>
+                      <span className="text-xs text-gray-400 ml-1">off</span>
+                    </td>
+                    <td className="py-3 pr-4 text-xs text-gray-500">
+                      {formatDate(coupon.validFrom)}
+                    </td>
+                    <td className="py-3 pr-4 text-xs text-gray-500">
+                      {formatDate(coupon.validTo)}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <div className="text-xs">
+                        <span className="font-semibold text-gray-700">
+                          {Number(coupon.usedCount)}
+                        </span>
+                        <span className="text-gray-400">
+                          {" "}
+                          / {Number(coupon.usageLimit)}
+                        </span>
+                      </div>
+                      <div className="w-20 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(100, (Number(coupon.usedCount) / Number(coupon.usageLimit)) * 100)}%`,
+                            background: "#2874f0",
+                          }}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-1 rounded border ${statusClass}`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      {coupon.isActive && !isExpired && !isExhausted ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-500 border-red-200 hover:bg-red-50 text-xs h-7"
+                          disabled={deactivatingCode === coupon.code}
+                          onClick={() => handleDeactivate(coupon.code)}
+                          data-ocid={`coupons.deactivate.${idx + 1}`}
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1" />
+                          {deactivatingCode === coupon.code
+                            ? "..."
+                            : "Deactivate"}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type AdminTab =
+  | "sellers"
+  | "allSellers"
+  | "orders"
+  | "returns"
+  | "earnings"
+  | "coupons";
 
 export default function AdminDashboard() {
   const { actor } = useActor();
@@ -256,7 +612,7 @@ export default function AdminDashboard() {
 
   const { data: allSellers = [], isLoading: allSellersLoading } = useQuery({
     queryKey: ["allSellers"],
-    queryFn: () => (actor as any).getAllSellers(),
+    queryFn: () => actor!.getAllSellers(),
     enabled,
   });
 
@@ -274,8 +630,7 @@ export default function AdminDashboard() {
 
   const { data: allReturnRequests = [], isLoading: returnsLoading } = useQuery({
     queryKey: ["allReturnRequests"],
-    queryFn: () =>
-      (actor as any).getAllReturnRequests() as Promise<ReturnRequest[]>,
+    queryFn: () => actor!.getAllReturnRequests() as Promise<ReturnRequest[]>,
     enabled,
   });
 
@@ -287,7 +642,7 @@ export default function AdminDashboard() {
   const handleApproveReturn = async (requestId: string) => {
     setReturnActionLoading(`approve-${requestId}`);
     try {
-      await (actor as any).approveReturn(requestId, null);
+      await actor!.approveReturn(requestId, null);
       toast.success("Return request approved!");
       queryClient.invalidateQueries({ queryKey: ["allReturnRequests"] });
     } catch (e) {
@@ -301,7 +656,7 @@ export default function AdminDashboard() {
   const handleRejectReturn = async (requestId: string) => {
     setReturnActionLoading(`reject-${requestId}`);
     try {
-      await (actor as any).rejectReturn(requestId, null);
+      await actor!.rejectReturn(requestId, null);
       toast.success("Return request rejected.");
       queryClient.invalidateQueries({ queryKey: ["allReturnRequests"] });
     } catch (e) {
@@ -369,6 +724,7 @@ export default function AdminDashboard() {
     { key: "allSellers", label: "All Sellers", count: sellerList.length },
     { key: "orders", label: "Orders", count: orderList.length },
     { key: "returns", label: "Returns", count: returnList.length },
+    { key: "coupons", label: "Coupons" },
     { key: "earnings", label: "Platform Earnings" },
   ];
 
@@ -444,13 +800,13 @@ export default function AdminDashboard() {
 
         {/* Tab navigation */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="flex border-b border-gray-100">
+          <div className="flex border-b border-gray-100 overflow-x-auto">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={`flex items-center gap-1.5 px-5 py-4 text-sm font-semibold border-b-2 transition-colors ${
+                className={`flex items-center gap-1.5 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                   tab === t.key
                     ? "border-[#2874f0] text-[#2874f0]"
                     : "border-transparent text-gray-500 hover:text-gray-700"
@@ -841,6 +1197,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Coupons Tab */}
+          {tab === "coupons" && <CouponsTab actor={actor} enabled={enabled} />}
+
           {/* Platform Earnings Tab */}
           {tab === "earnings" && (
             <div className="p-5">
@@ -912,7 +1271,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {orderList.map((order) => {
-                        const total = Number(order.totalAmount);
+                        const t = Number(order.totalAmount);
                         return (
                           <tr
                             key={order.id}
@@ -927,13 +1286,13 @@ export default function AdminDashboard() {
                               ).toLocaleDateString("en-IN")}
                             </td>
                             <td className="py-3 pr-4 font-semibold text-gray-800">
-                              ₹{(total / 100).toLocaleString()}
+                              ₹{(t / 100).toLocaleString()}
                             </td>
                             <td className="py-3 pr-4 font-semibold text-purple-600">
-                              ₹{((total * 0.1) / 100).toLocaleString()}
+                              ₹{((t * 0.1) / 100).toLocaleString()}
                             </td>
                             <td className="py-3 font-semibold text-green-600">
-                              ₹{((total * 0.9) / 100).toLocaleString()}
+                              ₹{((t * 0.9) / 100).toLocaleString()}
                             </td>
                           </tr>
                         );

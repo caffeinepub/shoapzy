@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Orders from "./pages/Orders";
 import ProductDetail from "./pages/ProductDetail";
 import SellerDashboard from "./pages/SellerDashboard";
+import SellerProfile from "./pages/SellerProfile";
 import SellerRegister from "./pages/SellerRegister";
 import SetupAdmin from "./pages/SetupAdmin";
 import Wishlist from "./pages/Wishlist";
@@ -73,6 +74,7 @@ function AppRoutes() {
           />
           <Route path="/login" element={<Login />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
+          <Route path="/seller/:principalId" element={<SellerProfile />} />
         </Routes>
       </main>
       <Footer />

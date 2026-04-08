@@ -51,6 +51,15 @@ export const ShoppingItem = IDL.Record({
   'priceInCents' : IDL.Nat,
   'productDescription' : IDL.Text,
 });
+export const CouponPublic = IDL.Record({
+  'validFrom' : IDL.Int,
+  'code' : IDL.Text,
+  'usedCount' : IDL.Nat,
+  'discountPercent' : IDL.Nat,
+  'validTo' : IDL.Int,
+  'isActive' : IDL.Bool,
+  'usageLimit' : IDL.Nat,
+});
 export const OrderStatus = IDL.Variant({
   'shipped' : IDL.Null,
   'cancelled' : IDL.Null,
@@ -117,6 +126,14 @@ export const ReviewSummary = IDL.Record({
   'productId' : IDL.Text,
   'averageRating' : IDL.Float64,
   'reviewCount' : IDL.Nat,
+});
+export const SellerProfileData = IDL.Record({
+  'principal' : IDL.Principal,
+  'shopDescription' : IDL.Opt(IDL.Text),
+  'productCount' : IDL.Nat,
+  'averageRating' : IDL.Float64,
+  'shopName' : IDL.Text,
+  'totalReviews' : IDL.Nat,
 });
 export const StripeSessionStatus = IDL.Variant({
   'completed' : IDL.Record({
@@ -193,6 +210,11 @@ export const idlService = IDL.Service({
     ),
   'addToCart' : IDL.Func([CartItem], [], []),
   'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'applyCoupon' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'approveReturn' : IDL.Func(
       [IDL.Text, IDL.Opt(IDL.Text)],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -208,7 +230,18 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'createCoupon' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Int, IDL.Int, IDL.Nat],
+      [IDL.Variant({ 'ok' : CouponPublic, 'err' : IDL.Text })],
+      [],
+    ),
+  'deactivateCoupon' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'deleteProduct' : IDL.Func([IDL.Text], [], []),
+  'getAllActiveCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
   'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
@@ -256,6 +289,16 @@ export const idlService = IDL.Service({
       [IDL.Vec(Product)],
       ['query'],
     ),
+  'getSellerProfileData' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(SellerProfileData)],
+      ['query'],
+    ),
+  'getSellerReviews' : IDL.Func(
+      [IDL.Principal, IDL.Nat],
+      [IDL.Vec(Review)],
+      ['query'],
+    ),
   'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
   'getUserOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
   'getUserProducts' : IDL.Func([IDL.Principal], [IDL.Vec(Product)], ['query']),
@@ -270,6 +313,7 @@ export const idlService = IDL.Service({
   'isInWishlist' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
+  'listCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
   'placeOrder' : IDL.Func([Order], [], []),
   'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
   'rejectReturn' : IDL.Func(
@@ -312,6 +356,11 @@ export const idlService = IDL.Service({
       ],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
+    ),
+  'validateCoupon' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      ['query'],
     ),
 });
 
@@ -360,6 +409,15 @@ export const idlFactory = ({ IDL }) => {
     'quantity' : IDL.Nat,
     'priceInCents' : IDL.Nat,
     'productDescription' : IDL.Text,
+  });
+  const CouponPublic = IDL.Record({
+    'validFrom' : IDL.Int,
+    'code' : IDL.Text,
+    'usedCount' : IDL.Nat,
+    'discountPercent' : IDL.Nat,
+    'validTo' : IDL.Int,
+    'isActive' : IDL.Bool,
+    'usageLimit' : IDL.Nat,
   });
   const OrderStatus = IDL.Variant({
     'shipped' : IDL.Null,
@@ -427,6 +485,14 @@ export const idlFactory = ({ IDL }) => {
     'productId' : IDL.Text,
     'averageRating' : IDL.Float64,
     'reviewCount' : IDL.Nat,
+  });
+  const SellerProfileData = IDL.Record({
+    'principal' : IDL.Principal,
+    'shopDescription' : IDL.Opt(IDL.Text),
+    'productCount' : IDL.Nat,
+    'averageRating' : IDL.Float64,
+    'shopName' : IDL.Text,
+    'totalReviews' : IDL.Nat,
   });
   const StripeSessionStatus = IDL.Variant({
     'completed' : IDL.Record({
@@ -500,6 +566,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'addToCart' : IDL.Func([CartItem], [], []),
     'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'applyCoupon' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'approveReturn' : IDL.Func(
         [IDL.Text, IDL.Opt(IDL.Text)],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -515,7 +586,18 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'createCoupon' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Int, IDL.Int, IDL.Nat],
+        [IDL.Variant({ 'ok' : CouponPublic, 'err' : IDL.Text })],
+        [],
+      ),
+    'deactivateCoupon' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'deleteProduct' : IDL.Func([IDL.Text], [], []),
+    'getAllActiveCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getAllReturnRequests' : IDL.Func([], [IDL.Vec(ReturnRequest)], ['query']),
     'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
@@ -563,6 +645,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Product)],
         ['query'],
       ),
+    'getSellerProfileData' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(SellerProfileData)],
+        ['query'],
+      ),
+    'getSellerReviews' : IDL.Func(
+        [IDL.Principal, IDL.Nat],
+        [IDL.Vec(Review)],
+        ['query'],
+      ),
     'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
     'getUserOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
     'getUserProducts' : IDL.Func(
@@ -581,6 +673,7 @@ export const idlFactory = ({ IDL }) => {
     'isInWishlist' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
+    'listCoupons' : IDL.Func([], [IDL.Vec(CouponPublic)], ['query']),
     'placeOrder' : IDL.Func([Order], [], []),
     'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
     'rejectReturn' : IDL.Func(
@@ -623,6 +716,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
+      ),
+    'validateCoupon' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        ['query'],
       ),
   });
 };

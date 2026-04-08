@@ -37,6 +37,14 @@ export interface SellerRegistration {
     shopDescription?: string;
     shopName: string;
 }
+export interface SellerProfileData {
+    principal: Principal;
+    shopDescription?: string;
+    productCount: bigint;
+    averageRating: number;
+    shopName: string;
+    totalReviews: bigint;
+}
 export interface SellerInfo {
     status: string;
     principal: Principal;
@@ -90,6 +98,15 @@ export interface Order {
 export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
+}
+export interface CouponPublic {
+    validFrom: bigint;
+    code: string;
+    usedCount: bigint;
+    discountPercent: bigint;
+    validTo: bigint;
+    isActive: boolean;
+    usageLimit: bigint;
 }
 export type StripeSessionStatus = {
     __kind__: "completed";
@@ -165,6 +182,13 @@ export interface backendInterface {
     }>;
     addToCart(item: CartItem): Promise<void>;
     addToWishlist(productId: string): Promise<boolean>;
+    applyCoupon(code: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     approveReturn(requestId: string, adminComment: string | null): Promise<{
         __kind__: "ok";
         ok: null;
@@ -178,7 +202,22 @@ export interface backendInterface {
     clearCallerCart(): Promise<void>;
     clearCart(): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
+    createCoupon(code: string, discountPercent: bigint, validFrom: bigint, validTo: bigint, usageLimit: bigint): Promise<{
+        __kind__: "ok";
+        ok: CouponPublic;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    deactivateCoupon(code: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     deleteProduct(productId: string): Promise<void>;
+    getAllActiveCoupons(): Promise<Array<CouponPublic>>;
     getAllOrders(): Promise<Array<Order>>;
     getAllReturnRequests(): Promise<Array<ReturnRequest>>;
     getAllSellers(): Promise<Array<SellerInfo>>;
@@ -202,6 +241,8 @@ export interface backendInterface {
     getReviewSummaries(): Promise<Array<ReviewSummary>>;
     getSellerOrders(seller: Principal): Promise<Array<Order>>;
     getSellerProducts(seller: Principal): Promise<Array<Product>>;
+    getSellerProfileData(seller: Principal): Promise<SellerProfileData | null>;
+    getSellerReviews(seller: Principal, limit: bigint): Promise<Array<Review>>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
     getUserOrders(user: Principal): Promise<Array<Order>>;
     getUserProducts(user: Principal): Promise<Array<Product>>;
@@ -212,6 +253,7 @@ export interface backendInterface {
     isInWishlist(productId: string): Promise<boolean>;
     isStripeConfigured(): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
+    listCoupons(): Promise<Array<CouponPublic>>;
     placeOrder(order: Order): Promise<void>;
     registerAsSeller(shopName: string, shopDescription: string | null): Promise<void>;
     rejectReturn(requestId: string, adminComment: string | null): Promise<{
@@ -240,6 +282,13 @@ export interface backendInterface {
     updateSellerOrderStatus(orderId: string, newStatus: OrderStatus): Promise<{
         __kind__: "ok";
         ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    validateCoupon(code: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
     } | {
         __kind__: "err";
         err: string;

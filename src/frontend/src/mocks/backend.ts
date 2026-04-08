@@ -117,4 +117,12 @@ export const mockBackend: backendInterface = {
   rejectReturn: async () => ({ __kind__: "ok" as const, ok: null }),
   submitReturnRequest: async () => ({ __kind__: "ok" as const, ok: { id: "mock-return-id", status: "pending" as const, orderId: "mock-order-id", adminComment: undefined, buyerId: samplePrincipal, timestamp: BigInt(0), reason: "mock reason" } }),
   updateSellerOrderStatus: async () => ({ __kind__: "ok" as const, ok: null }),
+  applyCoupon: async () => ({ __kind__: "ok" as const, ok: null }),
+  createCoupon: async () => ({ __kind__: "ok" as const, ok: { code: "SAVE10", discountPercent: BigInt(10), validFrom: BigInt(0), validTo: BigInt(Date.now() + 86400000), usageLimit: BigInt(100), usedCount: BigInt(0), isActive: true } }),
+  deactivateCoupon: async () => ({ __kind__: "ok" as const, ok: null }),
+  getAllActiveCoupons: async () => [],
+  listCoupons: async () => [],
+  validateCoupon: async () => ({ __kind__: "ok" as const, ok: BigInt(10) }),
+  getSellerProfileData: async () => null,
+  getSellerReviews: async () => [],
 };

@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import type { CartItem, Product, Review } from "../types";
@@ -552,10 +552,14 @@ export default function ProductDetail() {
               <Store className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
               <span className="text-muted-foreground">
                 Sold by{" "}
-                <span className="text-[#2874f0] font-medium">
+                <Link
+                  to={`/seller/${product.seller?.toString?.()}`}
+                  className="text-[#2874f0] font-medium hover:underline"
+                  data-ocid="pdp-seller-link"
+                >
                   {product.seller?.toString?.().slice(0, 10) ?? "Shoapzy Store"}
                   …
-                </span>
+                </Link>
               </span>
             </div>
             <div className="flex items-start gap-3 text-sm">

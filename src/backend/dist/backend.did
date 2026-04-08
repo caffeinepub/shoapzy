@@ -79,6 +79,15 @@ type SellerRegistration =
    shopDescription: opt text;
    shopName: text;
  };
+type SellerProfileData = 
+ record {
+   averageRating: float64;
+   "principal": principal;
+   productCount: nat;
+   shopDescription: opt text;
+   shopName: text;
+   totalReviews: nat;
+ };
 type SellerInfo = 
  record {
    "principal": principal;
@@ -159,6 +168,16 @@ type Order =
    totalAmount: nat;
  };
 type ExternalBlob = blob;
+type CouponPublic = 
+ record {
+   code: text;
+   discountPercent: nat;
+   isActive: bool;
+   usageLimit: nat;
+   usedCount: nat;
+   validFrom: int;
+   validTo: int;
+ };
 type CartItem = 
  record {
    price: nat;
@@ -191,6 +210,10 @@ service : {
     });
   addToCart: (item: CartItem) -> ();
   addToWishlist: (productId: text) -> (bool);
+  applyCoupon: (code: text) -> (variant {
+                                  err: text;
+                                  ok;
+                                });
   approveReturn: (requestId: text, adminComment: opt text) ->
    (variant {
       err: text;
@@ -203,7 +226,17 @@ service : {
   clearCart: () -> ();
   createCheckoutSession: (items: vec ShoppingItem, successUrl: text,
    cancelUrl: text) -> (text);
+  createCoupon: (code: text, discountPercent: nat, validFrom: int, validTo:
+   int, usageLimit: nat) -> (variant {
+                               err: text;
+                               ok: CouponPublic;
+                             });
+  deactivateCoupon: (code: text) -> (variant {
+                                       err: text;
+                                       ok;
+                                     });
   deleteProduct: (productId: text) -> ();
+  getAllActiveCoupons: () -> (vec CouponPublic) query;
   getAllOrders: () -> (vec Order) query;
   getAllReturnRequests: () -> (vec ReturnRequest) query;
   getAllSellers: () -> (vec SellerInfo) query;
@@ -232,6 +265,8 @@ service : {
   getReviewSummaries: () -> (vec ReviewSummary) query;
   getSellerOrders: (seller: principal) -> (vec Order) query;
   getSellerProducts: (seller: principal) -> (vec Product) query;
+  getSellerProfileData: (seller: principal) -> (opt SellerProfileData) query;
+  getSellerReviews: (seller: principal, limit: nat) -> (vec Review) query;
   getStripeSessionStatus: (sessionId: text) -> (StripeSessionStatus);
   getUserOrders: (user: principal) -> (vec Order) query;
   getUserProducts: (user: principal) -> (vec Product) query;
@@ -242,6 +277,7 @@ service : {
   isInWishlist: (productId: text) -> (bool) query;
   isStripeConfigured: () -> (bool) query;
   listApprovals: () -> (vec UserApprovalInfo) query;
+  listCoupons: () -> (vec CouponPublic) query;
   placeOrder: (order: Order) -> ();
   registerAsSeller: (shopName: text, shopDescription: opt text) -> ();
   rejectReturn: (requestId: text, adminComment: opt text) ->
@@ -278,4 +314,8 @@ service : {
             err: text;
             ok;
           });
+  validateCoupon: (code: text) -> (variant {
+                                     err: text;
+                                     ok: nat;
+                                   }) query;
 }

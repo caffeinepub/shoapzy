@@ -13,9 +13,12 @@ import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import MixinObjectStorage "mo:caffeineai-object-storage/Mixin";
 import ReturnsTypes "types/returns";
 import ReturnsMixin "mixins/returns-api";
-import Migration "migration";
+import SellerProfileMixin "mixins/seller-profile-api";
+import CouponsTypes "types/coupons";
+import CouponsApi "mixins/coupons-api";
 
-(with migration = Migration.run)
+
+
 actor {
   // Record seller registration
   public type SellerRegistration = {
@@ -138,9 +141,14 @@ actor {
   // Return requests
   let returnRequests = Map.empty<Text, ReturnsTypes.ReturnRequest>();
 
+  // Coupons
+  let coupons = Map.empty<Text, CouponsTypes.Coupon>();
+
   include MixinObjectStorage();
   include MixinAuthorization(accessControlState);
   include ReturnsMixin(returnRequests, accessControlState, orders);
+  include SellerProfileMixin(userProfiles, products, reviews);
+  include CouponsApi(coupons, accessControlState);
 
   // Helper: get seller status as text
   func getSellerStatus(principal : Principal) : Text {

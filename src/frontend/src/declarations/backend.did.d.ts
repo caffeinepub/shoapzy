@@ -19,6 +19,15 @@ export interface CartItem {
   'quantity' : bigint,
   'price' : bigint,
 }
+export interface CouponPublic {
+  'validFrom' : bigint,
+  'code' : string,
+  'usedCount' : bigint,
+  'discountPercent' : bigint,
+  'validTo' : bigint,
+  'isActive' : boolean,
+  'usageLimit' : bigint,
+}
 export type ExternalBlob = Uint8Array;
 export interface Order {
   'id' : string,
@@ -84,6 +93,14 @@ export interface SellerInfo {
   'principal' : Principal,
   'shopDescription' : [] | [string],
   'shopName' : string,
+}
+export interface SellerProfileData {
+  'principal' : Principal,
+  'shopDescription' : [] | [string],
+  'productCount' : bigint,
+  'averageRating' : number,
+  'shopName' : string,
+  'totalReviews' : bigint,
 }
 export interface SellerRegistration {
   'principal' : Principal,
@@ -173,6 +190,7 @@ export interface _SERVICE {
   >,
   'addToCart' : ActorMethod<[CartItem], undefined>,
   'addToWishlist' : ActorMethod<[string], boolean>,
+  'applyCoupon' : ActorMethod<[string], { 'ok' : null } | { 'err' : string }>,
   'approveReturn' : ActorMethod<
     [string, [] | [string]],
     { 'ok' : null } |
@@ -187,7 +205,18 @@ export interface _SERVICE {
     [Array<ShoppingItem>, string, string],
     string
   >,
+  'createCoupon' : ActorMethod<
+    [string, bigint, bigint, bigint, bigint],
+    { 'ok' : CouponPublic } |
+      { 'err' : string }
+  >,
+  'deactivateCoupon' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'deleteProduct' : ActorMethod<[string], undefined>,
+  'getAllActiveCoupons' : ActorMethod<[], Array<CouponPublic>>,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
   'getAllReturnRequests' : ActorMethod<[], Array<ReturnRequest>>,
   'getAllSellers' : ActorMethod<[], Array<SellerInfo>>,
@@ -216,6 +245,8 @@ export interface _SERVICE {
   'getReviewSummaries' : ActorMethod<[], Array<ReviewSummary>>,
   'getSellerOrders' : ActorMethod<[Principal], Array<Order>>,
   'getSellerProducts' : ActorMethod<[Principal], Array<Product>>,
+  'getSellerProfileData' : ActorMethod<[Principal], [] | [SellerProfileData]>,
+  'getSellerReviews' : ActorMethod<[Principal, bigint], Array<Review>>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
   'getUserOrders' : ActorMethod<[Principal], Array<Order>>,
   'getUserProducts' : ActorMethod<[Principal], Array<Product>>,
@@ -226,6 +257,7 @@ export interface _SERVICE {
   'isInWishlist' : ActorMethod<[string], boolean>,
   'isStripeConfigured' : ActorMethod<[], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
+  'listCoupons' : ActorMethod<[], Array<CouponPublic>>,
   'placeOrder' : ActorMethod<[Order], undefined>,
   'registerAsSeller' : ActorMethod<[string, [] | [string]], undefined>,
   'rejectReturn' : ActorMethod<
@@ -261,6 +293,11 @@ export interface _SERVICE {
         { 'return_rejected' : null },
     ],
     { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'validateCoupon' : ActorMethod<
+    [string],
+    { 'ok' : bigint } |
       { 'err' : string }
   >,
 }

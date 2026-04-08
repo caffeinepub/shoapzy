@@ -151,6 +151,18 @@ export function ProductCard({
           )}
         </div>
 
+        {/* Seller name */}
+        {product.seller && (
+          <Link
+            to={`/seller/${product.seller.toString()}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-[#2874f0] hover:underline mt-1 truncate block"
+            data-ocid="product-seller-link"
+          >
+            {product.seller.toString().slice(0, 12)}…
+          </Link>
+        )}
+
         {/* Pricing */}
         <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap">
           <span className="text-base font-bold text-foreground">

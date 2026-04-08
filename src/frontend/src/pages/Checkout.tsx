@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CreditCard, MapPin, Truck } from "lucide-react";
+import { CheckCircle2, CreditCard, MapPin, Tag, Truck, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
@@ -84,6 +84,7 @@ export default function Checkout() {
   const { identity } = useInternetIdentity();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
   const [placing, setPlacing] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -95,6 +96,15 @@ export default function Checkout() {
     state: "",
     pincode: "",
   });
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountPercent: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState("");
 
   const { data: cart = [] } = useQuery({
     queryKey: ["cart", identity?.getPrincipal().toString()],
@@ -109,10 +119,14 @@ export default function Checkout() {
   });
 
   const cartItems = cart as CartItem[];
-  const total = cartItems.reduce(
+  const subtotal = cartItems.reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0,
   );
+  const discountAmount = appliedCoupon
+    ? Math.round((subtotal * appliedCoupon.discountPercent) / 100)
+    : 0;
+  const total = subtotal - discountAmount;
 
   const isAddressComplete = FIELD_CONFIG.every((f) =>
     deliveryAddress[f.field].trim(),
@@ -124,11 +138,46 @@ export default function Checkout() {
       setDeliveryAddress((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
+  const handleApplyCoupon = async () => {
+    if (!actor || !couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    try {
+      const result = await actor.validateCoupon(
+        couponCode.trim().toUpperCase(),
+      );
+      if (result.__kind === "ok") {
+        const discount = Number(result.ok);
+        setAppliedCoupon({
+          code: couponCode.trim().toUpperCase(),
+          discountPercent: discount,
+        });
+        setCouponCode("");
+      } else {
+        setCouponError(result.err);
+        setAppliedCoupon(null);
+      }
+    } catch {
+      setCouponError("Failed to validate coupon. Please try again.");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError("");
+  };
+
   const handlePlaceOrder = async () => {
     if (!actor || !identity || cartItems.length === 0 || !isAddressComplete)
       return;
     setPlacing(true);
     try {
+      // Increment coupon usage if applied
+      if (appliedCoupon) {
+        await actor.applyCoupon(appliedCoupon.code);
+      }
       const addressStr = JSON.stringify(deliveryAddress);
       if (paymentMethod === "online") {
         const items: ShoppingItem[] = cartItems.map((item) => ({
@@ -255,7 +304,7 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Step 2: Order Summary */}
+            {/* Step 2: Order Summary + Coupon */}
             <div className="bg-card shadow-sm rounded-sm overflow-hidden">
               <StepHeader
                 number={2}
@@ -316,6 +365,79 @@ export default function Checkout() {
                       );
                     })}
                   </div>
+
+                  {/* Coupon Section */}
+                  <div className="mt-5 border border-dashed border-blue-200 rounded-sm p-4 bg-blue-50/40">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag className="w-4 h-4" style={{ color: "#2874f0" }} />
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: "#2874f0" }}
+                      >
+                        Apply Coupon
+                      </span>
+                    </div>
+
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-sm px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                          <div>
+                            <span className="text-sm font-bold text-green-700">
+                              {appliedCoupon.code}
+                            </span>
+                            <span className="text-xs text-green-600 ml-2">
+                              — {appliedCoupon.discountPercent}% off applied!
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="text-gray-400 hover:text-red-500 transition-colors ml-2"
+                          aria-label="Remove coupon"
+                          data-ocid="checkout-remove-coupon"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={(e) => {
+                            setCouponCode(e.target.value.toUpperCase());
+                            setCouponError("");
+                          }}
+                          placeholder="Enter coupon code"
+                          className="flex-1 border border-input rounded-sm px-3 py-2 text-sm bg-background focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors uppercase"
+                          data-ocid="checkout-coupon-input"
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleApplyCoupon()
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyCoupon}
+                          disabled={!couponCode.trim() || couponLoading}
+                          style={{ background: "#2874f0" }}
+                          className="text-white font-semibold px-5 py-2 rounded-sm text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-ocid="checkout-apply-coupon-btn"
+                        >
+                          {couponLoading ? "Checking..." : "APPLY"}
+                        </button>
+                      </div>
+                    )}
+
+                    {couponError && (
+                      <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                        <X className="w-3 h-3" />
+                        {couponError}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="mt-5 flex justify-end">
                     <button
                       type="button"
@@ -327,6 +449,27 @@ export default function Checkout() {
                       CONTINUE
                     </button>
                   </div>
+                </div>
+              )}
+              {step > 2 && (
+                <div className="px-6 py-3 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {cartItems.length} item{cartItems.length !== 1 ? "s" : ""}
+                    {appliedCoupon && (
+                      <span className="ml-2 text-green-600 font-medium">
+                        · Coupon: {appliedCoupon.code} (
+                        {appliedCoupon.discountPercent}% off)
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="text-xs font-medium"
+                    style={{ color: "#2874f0" }}
+                  >
+                    CHANGE
+                  </button>
                 </div>
               )}
             </div>
@@ -342,7 +485,6 @@ export default function Checkout() {
               {step === 3 && (
                 <div className="px-6 py-5">
                   <div className="space-y-3">
-                    {/* COD Option */}
                     <label
                       className={`flex items-center gap-4 border rounded-sm p-4 cursor-pointer transition-colors ${paymentMethod === "cod" ? "border-blue-500 bg-blue-50" : "border-border hover:border-blue-300"}`}
                       data-ocid="checkout-payment-cod"
@@ -371,7 +513,6 @@ export default function Checkout() {
                       </div>
                     </label>
 
-                    {/* Online Option */}
                     <label
                       className={`flex items-center gap-4 border rounded-sm p-4 cursor-pointer transition-colors ${paymentMethod === "online" ? "border-blue-500 bg-blue-50" : "border-border hover:border-blue-300"}`}
                       data-ocid="checkout-payment-online"
@@ -401,6 +542,37 @@ export default function Checkout() {
                       </div>
                     </label>
                   </div>
+
+                  {/* Order Review with coupon discount */}
+                  {appliedCoupon && (
+                    <div className="mt-5 border border-green-200 rounded-sm bg-green-50/60 p-4">
+                      <p className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wide">
+                        Order Total Breakdown
+                      </p>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Subtotal</span>
+                          <span>₹{(subtotal / 100).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-green-700 font-medium">
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3.5 h-3.5" />
+                            Coupon ({appliedCoupon.code} —{" "}
+                            {appliedCoupon.discountPercent}% off)
+                          </span>
+                          <span>
+                            − ₹{(discountAmount / 100).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-bold text-foreground border-t border-green-200 pt-2 mt-1">
+                          <span>Final Total</span>
+                          <span style={{ color: "#2874f0" }}>
+                            ₹{(total / 100).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="mt-6 flex justify-end">
                     <button
@@ -434,12 +606,25 @@ export default function Checkout() {
                     Price ({cartItems.length} item
                     {cartItems.length !== 1 ? "s" : ""})
                   </span>
-                  <span>₹{(total / 100).toLocaleString()}</span>
+                  <span>₹{(subtotal / 100).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-foreground">
-                  <span>Discount</span>
-                  <span style={{ color: "#388e3c" }}>− ₹0</span>
-                </div>
+                {appliedCoupon ? (
+                  <div
+                    className="flex justify-between"
+                    style={{ color: "#388e3c" }}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Tag className="w-3 h-3" />
+                      Coupon ({appliedCoupon.discountPercent}% off)
+                    </span>
+                    <span>− ₹{(discountAmount / 100).toLocaleString()}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-foreground">
+                    <span>Discount</span>
+                    <span style={{ color: "#388e3c" }}>− ₹0</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-foreground">
                   <span>Delivery Charges</span>
                   <span style={{ color: "#388e3c" }} className="font-medium">
@@ -451,6 +636,12 @@ export default function Checkout() {
                 <span>Total Amount</span>
                 <span>₹{(total / 100).toLocaleString()}</span>
               </div>
+              {appliedCoupon && (
+                <p className="text-xs mt-2 text-green-700 font-medium text-center bg-green-50 rounded px-2 py-1.5 border border-green-100">
+                  🎉 You save ₹{(discountAmount / 100).toLocaleString()} with
+                  coupon!
+                </p>
+              )}
             </div>
           </div>
         </div>
