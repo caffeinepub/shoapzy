@@ -31,7 +31,7 @@ export interface Product {
   isActive: boolean;
   seller: Principal;
   image: ExternalBlob;
-  variants?: ProductVariant[];
+  variants: ProductVariant[];
 }
 
 export interface CartItem {

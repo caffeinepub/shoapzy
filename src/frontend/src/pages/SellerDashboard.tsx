@@ -502,6 +502,10 @@ export default function SellerDashboard() {
       const sellingPricePaise = Math.round(
         mrpValue * (1 - discountValue / 100) * 100,
       );
+      // Preserve existing variants when editing; default to empty array for new products
+      const existingVariants = editId
+        ? ((products as Product[]).find((p) => p.id === editId)?.variants ?? [])
+        : [];
       const product: Product = {
         id: editId ?? crypto.randomUUID(),
         title: form.title,
@@ -514,6 +518,7 @@ export default function SellerDashboard() {
         isActive: true,
         seller: identity.getPrincipal(),
         image,
+        variants: existingVariants,
       };
       if (editId) {
         await actor.updateProduct(product);
