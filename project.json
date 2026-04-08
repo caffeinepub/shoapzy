@@ -1,0 +1,28 @@
+{
+  "overview": "Shoapzy is a Flipkart-style multi-vendor e-commerce marketplace where sellers list products and buyers shop across all categories. Features a polished blue-and-orange design with hero carousel, deals sections, MRP + discount pricing, and full checkout flow.",
+  "features": [
+    "Flipkart-style blue navbar with search bar and user dropdown",
+    "Hero carousel with auto-rotating promotional banners",
+    "Deals of the Day — top discounted products",
+    "Flash Sale section with newest products",
+    "Popular Products grid",
+    "Category showcase grid",
+    "Product cards with MRP strikethrough, selling price, and discount badge",
+    "Mock star ratings on product cards",
+    "Seller registration with admin approval",
+    "Product upload with MRP + discount pricing",
+    "Cart, checkout with delivery address, Stripe + COD payment",
+    "Admin dashboard with seller management and order tracking"
+  ],
+  "category": "e-commerce",
+  "tags": [
+    "ecommerce",
+    "marketplace",
+    "flipkart",
+    "multi-vendor",
+    "shopping",
+    "sellers",
+    "buyers"
+  ],
+  "last_updated": "2026-04-07T17:45:25.609Z"
+}

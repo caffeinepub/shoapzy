@@ -47,6 +47,31 @@ export interface Product {
   'image' : ExternalBlob,
   'price' : bigint,
 }
+export interface Review {
+  'id' : bigint,
+  'reviewText' : string,
+  'productId' : string,
+  'buyerId' : Principal,
+  'timestamp' : bigint,
+  'rating' : bigint,
+  'buyerName' : string,
+}
+export interface ReviewSummary {
+  'productId' : string,
+  'averageRating' : number,
+  'reviewCount' : bigint,
+}
+export interface SellerInfo {
+  'status' : string,
+  'principal' : Principal,
+  'shopDescription' : [] | [string],
+  'shopName' : string,
+}
+export interface SellerRegistration {
+  'principal' : Principal,
+  'shopDescription' : [] | [string],
+  'shopName' : string,
+}
 export interface ShoppingItem {
   'productName' : string,
   'currency' : string,
@@ -85,14 +110,14 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
-export interface _CaffeineStorageCreateCertificateResult {
+export interface _ImmutableObjectStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
 }
-export interface _CaffeineStorageRefillInformation {
+export interface _ImmutableObjectStorageRefillInformation {
   'proposed_top_up_amount' : [] | [bigint],
 }
-export interface _CaffeineStorageRefillResult {
+export interface _ImmutableObjectStorageRefillResult {
   'success' : [] | [boolean],
   'topped_up_amount' : [] | [bigint],
 }
@@ -103,24 +128,33 @@ export interface http_request_result {
   'headers' : Array<http_header>,
 }
 export interface _SERVICE {
-  '_caffeineStorageBlobIsLive' : ActorMethod<[Uint8Array], boolean>,
-  '_caffeineStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
-  '_caffeineStorageConfirmBlobDeletion' : ActorMethod<
+  '_immutableObjectStorageBlobsAreLive' : ActorMethod<
+    [Array<Uint8Array>],
+    Array<boolean>
+  >,
+  '_immutableObjectStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
+  '_immutableObjectStorageConfirmBlobDeletion' : ActorMethod<
     [Array<Uint8Array>],
     undefined
   >,
-  '_caffeineStorageCreateCertificate' : ActorMethod<
+  '_immutableObjectStorageCreateCertificate' : ActorMethod<
     [string],
-    _CaffeineStorageCreateCertificateResult
+    _ImmutableObjectStorageCreateCertificateResult
   >,
-  '_caffeineStorageRefillCashier' : ActorMethod<
-    [[] | [_CaffeineStorageRefillInformation]],
-    _CaffeineStorageRefillResult
+  '_immutableObjectStorageRefillCashier' : ActorMethod<
+    [[] | [_ImmutableObjectStorageRefillInformation]],
+    _ImmutableObjectStorageRefillResult
   >,
-  '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  '_immutableObjectStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
+  '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addProduct' : ActorMethod<[Product], undefined>,
+  'addReview' : ActorMethod<
+    [string, bigint, string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'addToCart' : ActorMethod<[CartItem], undefined>,
+  'addToWishlist' : ActorMethod<[string], boolean>,
   'approveSeller' : ActorMethod<[Principal], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'claimAdminRole' : ActorMethod<[], undefined>,
@@ -132,9 +166,12 @@ export interface _SERVICE {
   >,
   'deleteProduct' : ActorMethod<[string], undefined>,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getAllSellers' : ActorMethod<[], Array<SellerInfo>>,
   'getCallerCart' : ActorMethod<[], [] | [Array<CartItem>]>,
+  'getCallerSellerStatus' : ActorMethod<[], string>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCallerWishlist' : ActorMethod<[], Array<string>>,
   'getOrderCommissionBreakdown' : ActorMethod<
     [string],
     [] | [
@@ -144,9 +181,13 @@ export interface _SERVICE {
       }
     ]
   >,
+  'getPendingSellerDetails' : ActorMethod<[], Array<SellerRegistration>>,
   'getPendingSellerRegistrations' : ActorMethod<[], Array<Principal>>,
   'getPlatformEarnings' : ActorMethod<[], bigint>,
+  'getProductAverageRating' : ActorMethod<[string], number>,
+  'getProductReviews' : ActorMethod<[string], Array<Review>>,
   'getProducts' : ActorMethod<[], Array<Product>>,
+  'getReviewSummaries' : ActorMethod<[], Array<ReviewSummary>>,
   'getSellerOrders' : ActorMethod<[Principal], Array<Order>>,
   'getSellerProducts' : ActorMethod<[Principal], Array<Product>>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
@@ -156,11 +197,13 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isCallerApproved' : ActorMethod<[], boolean>,
   'isCallerSellerApproved' : ActorMethod<[], boolean>,
+  'isInWishlist' : ActorMethod<[string], boolean>,
   'isStripeConfigured' : ActorMethod<[], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'placeOrder' : ActorMethod<[Order], undefined>,
   'registerAsSeller' : ActorMethod<[string, [] | [string]], undefined>,
   'rejectSeller' : ActorMethod<[Principal], undefined>,
+  'removeFromWishlist' : ActorMethod<[string], boolean>,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,

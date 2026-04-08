@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { UserRole } from "./backend";
+import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
 import { useActor } from "./hooks/useActor";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
@@ -14,6 +14,8 @@ import ProductDetail from "./pages/ProductDetail";
 import SellerDashboard from "./pages/SellerDashboard";
 import SellerRegister from "./pages/SellerRegister";
 import SetupAdmin from "./pages/SetupAdmin";
+import Wishlist from "./pages/Wishlist";
+import { UserRole } from "./types";
 
 function AppRoutes() {
   const { identity } = useInternetIdentity();
@@ -27,44 +29,53 @@ function AppRoutes() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/product/:id" element={<ProductDetail />} />
-        <Route
-          path="/cart"
-          element={isLoggedIn ? <Cart /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/checkout"
-          element={isLoggedIn ? <Checkout /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/orders"
-          element={isLoggedIn ? <Orders /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/seller/register"
-          element={isLoggedIn ? <SellerRegister /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/seller/dashboard"
-          element={isLoggedIn ? <SellerDashboard /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/admin"
-          element={
-            isLoggedIn && role === UserRole.admin ? (
-              <AdminDashboard />
-            ) : (
-              <Navigate to="/" />
-            )
-          }
-        />
-        <Route path="/login" element={<Login />} />
-        <Route path="/setup-admin" element={<SetupAdmin />} />
-      </Routes>
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/product/:id" element={<ProductDetail />} />
+          <Route
+            path="/cart"
+            element={isLoggedIn ? <Cart /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/checkout"
+            element={isLoggedIn ? <Checkout /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/orders"
+            element={isLoggedIn ? <Orders /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/wishlist"
+            element={isLoggedIn ? <Wishlist /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/seller/register"
+            element={isLoggedIn ? <SellerRegister /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/seller/dashboard"
+            element={
+              isLoggedIn ? <SellerDashboard /> : <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              isLoggedIn && role === UserRole.admin ? (
+                <AdminDashboard />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route path="/login" element={<Login />} />
+          <Route path="/setup-admin" element={<SetupAdmin />} />
+        </Routes>
+      </main>
+      <Footer />
     </div>
   );
 }

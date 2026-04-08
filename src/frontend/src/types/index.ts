@@ -1,0 +1,98 @@
+import type { Principal } from "@icp-sdk/core/principal";
+import { ExternalBlob } from "../backend";
+
+export { ExternalBlob };
+
+// User role enum equivalent
+export const UserRole = {
+  admin: "admin",
+  seller: "seller",
+  buyer: "buyer",
+} as const;
+export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
+
+export interface UserProfile {
+  name: string;
+  shopName?: string;
+  shopDescription?: string;
+  role: string;
+  sellerApproved: boolean;
+}
+
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: bigint;
+  mrp: bigint;
+  discountPercent: bigint;
+  category: string;
+  stock: bigint;
+  isActive: boolean;
+  seller: Principal;
+  image: ExternalBlob;
+}
+
+export interface CartItem {
+  productId: string;
+  seller: Principal;
+  quantity: bigint;
+  price: bigint;
+}
+
+export const OrderStatus = {
+  pending: { pending: null },
+  approved: { approved: null },
+  shipped: { shipped: null },
+  delivered: { delivered: null },
+  cancelled: { cancelled: null },
+} as const;
+export type OrderStatusType = (typeof OrderStatus)[keyof typeof OrderStatus];
+// biome-ignore lint/suspicious/noExplicitAny: variant object
+export type OrderStatus = any;
+
+export interface ShoppingItem {
+  productName: string;
+  currency: string;
+  quantity: bigint;
+  priceInCents: bigint;
+  productDescription: string;
+}
+
+export const Variant_cod_online = {
+  online: { online: null },
+  cod: { cod: null },
+} as const;
+
+export interface Order {
+  id: string;
+  buyer: Principal;
+  items: CartItem[];
+  totalAmount: bigint;
+  paymentMethod: { online: null } | { cod: null };
+  status: OrderStatus;
+  timestamp: bigint;
+  deliveryAddress?: string;
+}
+
+export interface SellerRegistration {
+  principal: Principal;
+  shopName: string;
+  shopDescription?: string;
+}
+
+export interface Review {
+  id: bigint;
+  productId: string;
+  buyerId: Principal;
+  buyerName: string;
+  rating: bigint;
+  reviewText: string;
+  timestamp: bigint;
+}
+
+export interface ReviewSummary {
+  productId: string;
+  averageRating: number;
+  reviewCount: bigint;
+}

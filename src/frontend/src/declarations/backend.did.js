@@ -8,14 +8,14 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const _CaffeineStorageCreateCertificateResult = IDL.Record({
+export const _ImmutableObjectStorageCreateCertificateResult = IDL.Record({
   'method' : IDL.Text,
   'blob_hash' : IDL.Text,
 });
-export const _CaffeineStorageRefillInformation = IDL.Record({
+export const _ImmutableObjectStorageRefillInformation = IDL.Record({
   'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
 });
-export const _CaffeineStorageRefillResult = IDL.Record({
+export const _ImmutableObjectStorageRefillResult = IDL.Record({
   'success' : IDL.Opt(IDL.Bool),
   'topped_up_amount' : IDL.Opt(IDL.Nat),
 });
@@ -66,12 +66,37 @@ export const Order = IDL.Record({
   'buyer' : IDL.Principal,
   'items' : IDL.Vec(CartItem),
 });
+export const SellerInfo = IDL.Record({
+  'status' : IDL.Text,
+  'principal' : IDL.Principal,
+  'shopDescription' : IDL.Opt(IDL.Text),
+  'shopName' : IDL.Text,
+});
 export const UserProfile = IDL.Record({
   'shopDescription' : IDL.Opt(IDL.Text),
   'name' : IDL.Text,
   'role' : IDL.Text,
   'sellerApproved' : IDL.Bool,
   'shopName' : IDL.Opt(IDL.Text),
+});
+export const SellerRegistration = IDL.Record({
+  'principal' : IDL.Principal,
+  'shopDescription' : IDL.Opt(IDL.Text),
+  'shopName' : IDL.Text,
+});
+export const Review = IDL.Record({
+  'id' : IDL.Nat,
+  'reviewText' : IDL.Text,
+  'productId' : IDL.Text,
+  'buyerId' : IDL.Principal,
+  'timestamp' : IDL.Int,
+  'rating' : IDL.Nat,
+  'buyerName' : IDL.Text,
+});
+export const ReviewSummary = IDL.Record({
+  'productId' : IDL.Text,
+  'averageRating' : IDL.Float64,
+  'reviewCount' : IDL.Nat,
 });
 export const StripeSessionStatus = IDL.Variant({
   'completed' : IDL.Record({
@@ -113,37 +138,44 @@ export const TransformationOutput = IDL.Record({
 });
 
 export const idlService = IDL.Service({
-  '_caffeineStorageBlobIsLive' : IDL.Func(
-      [IDL.Vec(IDL.Nat8)],
-      [IDL.Bool],
+  '_immutableObjectStorageBlobsAreLive' : IDL.Func(
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      [IDL.Vec(IDL.Bool)],
       ['query'],
     ),
-  '_caffeineStorageBlobsToDelete' : IDL.Func(
+  '_immutableObjectStorageBlobsToDelete' : IDL.Func(
       [],
       [IDL.Vec(IDL.Vec(IDL.Nat8))],
       ['query'],
     ),
-  '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+  '_immutableObjectStorageConfirmBlobDeletion' : IDL.Func(
       [IDL.Vec(IDL.Vec(IDL.Nat8))],
       [],
       [],
     ),
-  '_caffeineStorageCreateCertificate' : IDL.Func(
+  '_immutableObjectStorageCreateCertificate' : IDL.Func(
       [IDL.Text],
-      [_CaffeineStorageCreateCertificateResult],
+      [_ImmutableObjectStorageCreateCertificateResult],
       [],
     ),
-  '_caffeineStorageRefillCashier' : IDL.Func(
-      [IDL.Opt(_CaffeineStorageRefillInformation)],
-      [_CaffeineStorageRefillResult],
+  '_immutableObjectStorageRefillCashier' : IDL.Func(
+      [IDL.Opt(_ImmutableObjectStorageRefillInformation)],
+      [_ImmutableObjectStorageRefillResult],
       [],
     ),
-  '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+  '_initializeAccessControl' : IDL.Func([], [], []),
   'addProduct' : IDL.Func([Product], [], []),
+  'addReview' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'addToCart' : IDL.Func([CartItem], [], []),
+  'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'approveSeller' : IDL.Func([IDL.Principal], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'claimAdminRole' : IDL.Func([], [], []),
   'clearCallerCart' : IDL.Func([], [], []),
   'clearCart' : IDL.Func([], [], []),
   'createCheckoutSession' : IDL.Func(
@@ -153,9 +185,12 @@ export const idlService = IDL.Service({
     ),
   'deleteProduct' : IDL.Func([IDL.Text], [], []),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
   'getCallerCart' : IDL.Func([], [IDL.Opt(IDL.Vec(CartItem))], ['query']),
+  'getCallerSellerStatus' : IDL.Func([], [IDL.Text], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getOrderCommissionBreakdown' : IDL.Func(
       [IDL.Text],
       [
@@ -168,13 +203,21 @@ export const idlService = IDL.Service({
       ],
       ['query'],
     ),
+  'getPendingSellerDetails' : IDL.Func(
+      [],
+      [IDL.Vec(SellerRegistration)],
+      ['query'],
+    ),
   'getPendingSellerRegistrations' : IDL.Func(
       [],
       [IDL.Vec(IDL.Principal)],
       ['query'],
     ),
   'getPlatformEarnings' : IDL.Func([], [IDL.Nat], ['query']),
+  'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
+  'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+  'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
   'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
   'getSellerProducts' : IDL.Func(
       [IDL.Principal],
@@ -192,11 +235,13 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerSellerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+  'isInWishlist' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'placeOrder' : IDL.Func([Order], [], []),
   'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
   'rejectSeller' : IDL.Func([IDL.Principal], [], []),
+  'removeFromWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
@@ -213,14 +258,14 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const _CaffeineStorageCreateCertificateResult = IDL.Record({
+  const _ImmutableObjectStorageCreateCertificateResult = IDL.Record({
     'method' : IDL.Text,
     'blob_hash' : IDL.Text,
   });
-  const _CaffeineStorageRefillInformation = IDL.Record({
+  const _ImmutableObjectStorageRefillInformation = IDL.Record({
     'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
   });
-  const _CaffeineStorageRefillResult = IDL.Record({
+  const _ImmutableObjectStorageRefillResult = IDL.Record({
     'success' : IDL.Opt(IDL.Bool),
     'topped_up_amount' : IDL.Opt(IDL.Nat),
   });
@@ -271,12 +316,37 @@ export const idlFactory = ({ IDL }) => {
     'buyer' : IDL.Principal,
     'items' : IDL.Vec(CartItem),
   });
+  const SellerInfo = IDL.Record({
+    'status' : IDL.Text,
+    'principal' : IDL.Principal,
+    'shopDescription' : IDL.Opt(IDL.Text),
+    'shopName' : IDL.Text,
+  });
   const UserProfile = IDL.Record({
     'shopDescription' : IDL.Opt(IDL.Text),
     'name' : IDL.Text,
     'role' : IDL.Text,
     'sellerApproved' : IDL.Bool,
     'shopName' : IDL.Opt(IDL.Text),
+  });
+  const SellerRegistration = IDL.Record({
+    'principal' : IDL.Principal,
+    'shopDescription' : IDL.Opt(IDL.Text),
+    'shopName' : IDL.Text,
+  });
+  const Review = IDL.Record({
+    'id' : IDL.Nat,
+    'reviewText' : IDL.Text,
+    'productId' : IDL.Text,
+    'buyerId' : IDL.Principal,
+    'timestamp' : IDL.Int,
+    'rating' : IDL.Nat,
+    'buyerName' : IDL.Text,
+  });
+  const ReviewSummary = IDL.Record({
+    'productId' : IDL.Text,
+    'averageRating' : IDL.Float64,
+    'reviewCount' : IDL.Nat,
   });
   const StripeSessionStatus = IDL.Variant({
     'completed' : IDL.Record({
@@ -315,37 +385,44 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
-    '_caffeineStorageBlobIsLive' : IDL.Func(
-        [IDL.Vec(IDL.Nat8)],
-        [IDL.Bool],
+    '_immutableObjectStorageBlobsAreLive' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [IDL.Vec(IDL.Bool)],
         ['query'],
       ),
-    '_caffeineStorageBlobsToDelete' : IDL.Func(
+    '_immutableObjectStorageBlobsToDelete' : IDL.Func(
         [],
         [IDL.Vec(IDL.Vec(IDL.Nat8))],
         ['query'],
       ),
-    '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+    '_immutableObjectStorageConfirmBlobDeletion' : IDL.Func(
         [IDL.Vec(IDL.Vec(IDL.Nat8))],
         [],
         [],
       ),
-    '_caffeineStorageCreateCertificate' : IDL.Func(
+    '_immutableObjectStorageCreateCertificate' : IDL.Func(
         [IDL.Text],
-        [_CaffeineStorageCreateCertificateResult],
+        [_ImmutableObjectStorageCreateCertificateResult],
         [],
       ),
-    '_caffeineStorageRefillCashier' : IDL.Func(
-        [IDL.Opt(_CaffeineStorageRefillInformation)],
-        [_CaffeineStorageRefillResult],
+    '_immutableObjectStorageRefillCashier' : IDL.Func(
+        [IDL.Opt(_ImmutableObjectStorageRefillInformation)],
+        [_ImmutableObjectStorageRefillResult],
         [],
       ),
-    '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    '_immutableObjectStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+    '_initializeAccessControl' : IDL.Func([], [], []),
     'addProduct' : IDL.Func([Product], [], []),
+    'addReview' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'addToCart' : IDL.Func([CartItem], [], []),
+    'addToWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'approveSeller' : IDL.Func([IDL.Principal], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'claimAdminRole' : IDL.Func([], [], []),
     'clearCallerCart' : IDL.Func([], [], []),
     'clearCart' : IDL.Func([], [], []),
     'createCheckoutSession' : IDL.Func(
@@ -355,9 +432,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteProduct' : IDL.Func([IDL.Text], [], []),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getAllSellers' : IDL.Func([], [IDL.Vec(SellerInfo)], ['query']),
     'getCallerCart' : IDL.Func([], [IDL.Opt(IDL.Vec(CartItem))], ['query']),
+    'getCallerSellerStatus' : IDL.Func([], [IDL.Text], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getCallerWishlist' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getOrderCommissionBreakdown' : IDL.Func(
         [IDL.Text],
         [
@@ -370,13 +450,21 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getPendingSellerDetails' : IDL.Func(
+        [],
+        [IDL.Vec(SellerRegistration)],
+        ['query'],
+      ),
     'getPendingSellerRegistrations' : IDL.Func(
         [],
         [IDL.Vec(IDL.Principal)],
         ['query'],
       ),
     'getPlatformEarnings' : IDL.Func([], [IDL.Nat], ['query']),
+    'getProductAverageRating' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
+    'getProductReviews' : IDL.Func([IDL.Text], [IDL.Vec(Review)], ['query']),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
+    'getReviewSummaries' : IDL.Func([], [IDL.Vec(ReviewSummary)], ['query']),
     'getSellerOrders' : IDL.Func([IDL.Principal], [IDL.Vec(Order)], ['query']),
     'getSellerProducts' : IDL.Func(
         [IDL.Principal],
@@ -398,11 +486,13 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerSellerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+    'isInWishlist' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'placeOrder' : IDL.Func([Order], [], []),
     'registerAsSeller' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
     'rejectSeller' : IDL.Func([IDL.Principal], [], []),
+    'removeFromWishlist' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),

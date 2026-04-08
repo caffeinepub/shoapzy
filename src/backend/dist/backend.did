@@ -1,0 +1,226 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = 
+ record {
+   name: text;
+   role: text;
+   sellerApproved: bool;
+   shopDescription: opt text;
+   shopName: opt text;
+ };
+type UserApprovalInfo = 
+ record {
+   "principal": principal;
+   status: ApprovalStatus;
+ };
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: http_request_result;
+ };
+type StripeSessionStatus = 
+ variant {
+   completed: record {
+                response: text;
+                userPrincipal: opt text;
+              };
+   failed: record {error: text;};
+ };
+type StripeConfiguration = 
+ record {
+   allowedCountries: vec text;
+   secretKey: text;
+ };
+type ShoppingItem = 
+ record {
+   currency: text;
+   priceInCents: nat;
+   productDescription: text;
+   productName: text;
+   quantity: nat;
+ };
+type SellerRegistration = 
+ record {
+   "principal": principal;
+   shopDescription: opt text;
+   shopName: text;
+ };
+type SellerInfo = 
+ record {
+   "principal": principal;
+   shopDescription: opt text;
+   shopName: text;
+   status: text;
+ };
+type ReviewSummary = 
+ record {
+   averageRating: float64;
+   productId: text;
+   reviewCount: nat;
+ };
+type Review = 
+ record {
+   buyerId: principal;
+   buyerName: text;
+   id: nat;
+   productId: text;
+   rating: nat;
+   reviewText: text;
+   timestamp: int;
+ };
+type Product = 
+ record {
+   category: text;
+   description: text;
+   id: text;
+   image: ExternalBlob;
+   isActive: bool;
+   price: nat;
+   seller: principal;
+   stock: nat;
+   title: text;
+ };
+type OrderStatus = 
+ variant {
+   approved;
+   cancelled;
+   delivered;
+   paid;
+   pending;
+   shipped;
+ };
+type Order = 
+ record {
+   buyer: principal;
+   id: text;
+   items: vec CartItem;
+   paymentMethod: variant {
+                    cod;
+                    online;
+                  };
+   status: OrderStatus;
+   timestamp: int;
+   totalAmount: nat;
+ };
+type ExternalBlob = blob;
+type CartItem = 
+ record {
+   price: nat;
+   productId: text;
+   quantity: nat;
+   seller: principal;
+ };
+type ApprovalStatus = 
+ variant {
+   approved;
+   pending;
+   rejected;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControl: () -> ();
+  addProduct: (product: Product) -> ();
+  addReview: (productId: text, rating: nat, reviewText: text) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
+  addToCart: (item: CartItem) -> ();
+  addToWishlist: (productId: text) -> (bool);
+  approveSeller: (seller: principal) -> ();
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  claimAdminRole: () -> ();
+  clearCallerCart: () -> ();
+  clearCart: () -> ();
+  createCheckoutSession: (items: vec ShoppingItem, successUrl: text,
+   cancelUrl: text) -> (text);
+  deleteProduct: (productId: text) -> ();
+  getAllOrders: () -> (vec Order) query;
+  getAllSellers: () -> (vec SellerInfo) query;
+  getCallerCart: () -> (opt vec CartItem) query;
+  getCallerSellerStatus: () -> (text) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getCallerWishlist: () -> (vec text) query;
+  getOrderCommissionBreakdown: (orderId: text) ->
+   (opt
+     record {
+       adminCommission: nat;
+       sellerPayments: vec record {
+                             principal;
+                             nat;
+                           };
+     }) query;
+  getPendingSellerDetails: () -> (vec SellerRegistration) query;
+  getPendingSellerRegistrations: () -> (vec principal) query;
+  getPlatformEarnings: () -> (nat) query;
+  getProductAverageRating: (productId: text) -> (float64) query;
+  getProductReviews: (productId: text) -> (vec Review) query;
+  getProducts: () -> (vec Product) query;
+  getReviewSummaries: () -> (vec ReviewSummary) query;
+  getSellerOrders: (seller: principal) -> (vec Order) query;
+  getSellerProducts: (seller: principal) -> (vec Product) query;
+  getStripeSessionStatus: (sessionId: text) -> (StripeSessionStatus);
+  getUserOrders: (user: principal) -> (vec Order) query;
+  getUserProducts: (user: principal) -> (vec Product) query;
+  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  isCallerAdmin: () -> (bool) query;
+  isCallerApproved: () -> (bool) query;
+  isCallerSellerApproved: () -> (bool) query;
+  isInWishlist: (productId: text) -> (bool) query;
+  isStripeConfigured: () -> (bool) query;
+  listApprovals: () -> (vec UserApprovalInfo) query;
+  placeOrder: (order: Order) -> ();
+  registerAsSeller: (shopName: text, shopDescription: opt text) -> ();
+  rejectSeller: (seller: principal) -> ();
+  removeFromWishlist: (productId: text) -> (bool);
+  requestApproval: () -> ();
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  setApproval: (user: principal, status: ApprovalStatus) -> ();
+  setStripeConfiguration: (config: StripeConfiguration) -> ();
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+  updateOrderStatus: (orderId: text, status: OrderStatus) -> ();
+  updateProduct: (product: Product) -> ();
+}

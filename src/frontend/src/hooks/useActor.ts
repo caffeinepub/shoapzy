@@ -1,62 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import type { backendInterface } from "../backend";
-import { createActorWithConfig } from "../config";
-import { getSecretParameter } from "../utils/urlParams";
-import { useInternetIdentity } from "./useInternetIdentity";
+import { useActor as useActorBase } from "@caffeineai/core-infrastructure";
+import { createActor } from "../backend";
 
-const ACTOR_QUERY_KEY = "actor";
-export function useActor() {
-  const { identity } = useInternetIdentity();
-  const queryClient = useQueryClient();
-  const actorQuery = useQuery<backendInterface>({
-    queryKey: [ACTOR_QUERY_KEY, identity?.getPrincipal().toString()],
-    queryFn: async () => {
-      const isAuthenticated = !!identity;
+// biome-ignore lint/suspicious/noExplicitAny: backend actor needs dynamic methods
+type AnyActor = any;
 
-      if (!isAuthenticated) {
-        // Return anonymous actor if not authenticated
-        return await createActorWithConfig();
-      }
+let _actor: AnyActor | null = null;
+let _isFetching = false;
 
-      const actorOptions = {
-        agentOptions: {
-          identity,
-        },
-      };
-
-      const actor = await createActorWithConfig(actorOptions);
-      // Initialize access control in background -- don't block actor creation
-      const adminToken = getSecretParameter("caffeineAdminToken") || "";
-      actor._initializeAccessControlWithSecret(adminToken).catch(() => {
-        // Ignore errors -- actor still works without this
-      });
-      return actor;
-    },
-    // Only refetch when identity changes
-    staleTime: Number.POSITIVE_INFINITY,
-    // This will cause the actor to be recreated when the identity changes
-    enabled: true,
-  });
-
-  // When the actor changes, invalidate dependent queries
-  useEffect(() => {
-    if (actorQuery.data) {
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
-      });
-      queryClient.refetchQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
-      });
-    }
-  }, [actorQuery.data, queryClient]);
-
-  return {
-    actor: actorQuery.data || null,
-    isFetching: actorQuery.isFetching,
-  };
+// Wrap the infrastructure useActor with the app's createActor bound in
+export function useActor(): { actor: AnyActor | null; isFetching: boolean } {
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic actor
+  const result = useActorBase(createActor as any);
+  return result as { actor: AnyActor | null; isFetching: boolean };
 }

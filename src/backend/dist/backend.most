@@ -1,0 +1,104 @@
+// Version: 1.0.0
+type ApprovalStatus__575141016 = {#approved; #pending; #rejected};
+type CartItem__113002840 =
+  {price : Nat; productId : Text; quantity : Nat; seller : Principal};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type ExternalBlob__246066408 = Blob;
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OrderStatus__838108808 =
+  {#approved; #cancelled; #delivered; #paid; #pending; #shipped};
+type Order__762448211 =
+  {
+    buyer : Principal;
+    id : Text;
+    items : [CartItem__113002840];
+    paymentMethod : {#cod; #online};
+    status : OrderStatus__838108808;
+    timestamp : Int;
+    totalAmount : Nat
+  };
+type Product__853085059 =
+  {
+    category : Text;
+    description : Text;
+    id : Text;
+    image : ExternalBlob__246066408;
+    isActive : Bool;
+    price : Nat;
+    seller : Principal;
+    stock : Nat;
+    title : Text
+  };
+type Review__422344017 =
+  {
+    buyerId : Principal;
+    buyerName : Text;
+    id : Nat;
+    productId : Text;
+    rating : Nat;
+    reviewText : Text;
+    timestamp : Int
+  };
+type UserProfile__491224006 =
+  {
+    name : Text;
+    role : Text;
+    sellerApproved : Bool;
+    shopDescription : ?Text;
+    shopName : ?Text
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable approvalState :
+    {
+      var approvalStatus :
+        Map__605269027<Principal, ApprovalStatus__575141016>
+    };
+  stable carts :
+    {
+      var root : Node__46230540<Principal, [CartItem__113002840]>;
+      var size : Nat__490723111
+    };
+  stable orders :
+    {
+      var root : Node__46230540<Text, Order__762448211>;
+      var size : Nat__490723111
+    };
+  stable products :
+    {
+      var root : Node__46230540<Text, Product__853085059>;
+      var size : Nat__490723111
+    };
+  stable rejectedSellers :
+    {var root : Node__46230540<Principal, Bool>; var size : Nat__490723111};
+  stable var reviewCounter : Nat;
+  stable reviews :
+    {
+      var root : Node__46230540<Nat, Review__422344017>;
+      var size : Nat__490723111
+    };
+  stable storageState : {};
+  stable userProfiles :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    };
+  stable wishlists :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111}
+};
