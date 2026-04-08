@@ -17,7 +17,6 @@ import SellerProfile from "./pages/SellerProfile";
 import SellerRegister from "./pages/SellerRegister";
 import SetupAdmin from "./pages/SetupAdmin";
 import Wishlist from "./pages/Wishlist";
-import { UserRole } from "./types";
 
 // Batch 5 pages — lazy loaded
 const SavedAddresses = lazy(() => import("./pages/SavedAddresses"));
@@ -43,9 +42,9 @@ function AppRoutes() {
   const { actor } = useActor();
   const isLoggedIn = !!identity;
 
-  const { data: role } = useQuery({
-    queryKey: ["role", identity?.getPrincipal().toString()],
-    queryFn: () => actor!.getCallerUserRole(),
+  const { data: isAdmin } = useQuery({
+    queryKey: ["isAdmin", identity?.getPrincipal().toString()],
+    queryFn: () => actor!.isCallerAdmin(),
     enabled: !!actor && isLoggedIn,
   });
 
@@ -85,7 +84,7 @@ function AppRoutes() {
           <Route
             path="/admin"
             element={
-              isLoggedIn && role === UserRole.admin ? (
+              isLoggedIn && isAdmin === true ? (
                 <AdminDashboard />
               ) : (
                 <Navigate to="/" />

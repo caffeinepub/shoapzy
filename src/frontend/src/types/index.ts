@@ -3,11 +3,11 @@ import { ExternalBlob } from "../backend";
 
 export { ExternalBlob };
 
-// User role enum equivalent
+// User role enum — must match backend UserRole enum exactly (admin/user/guest)
 export const UserRole = {
   admin: "admin",
-  seller: "seller",
-  buyer: "buyer",
+  user: "user",
+  guest: "guest",
 } as const;
 export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 

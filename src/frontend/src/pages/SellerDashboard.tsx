@@ -321,6 +321,8 @@ export default function SellerDashboard() {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [orderUpdateState, setOrderUpdateState] = useState<
@@ -486,7 +488,15 @@ export default function SellerDashboard() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!actor || !identity) return;
+    if (!isApproved) {
+      setSaveError(
+        "Your seller account is pending approval. You cannot add products yet.",
+      );
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
     try {
       let image: ExternalBlob;
       if (imageFile) {
@@ -537,7 +547,16 @@ export default function SellerDashboard() {
       });
       setImageFile(null);
       setEditId(null);
+      setSaveSuccess(true);
       setTab("products");
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : "Failed to save product. Please try again.";
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -1050,33 +1069,52 @@ export default function SellerDashboard() {
                   />
                 </div>
 
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    type="submit"
-                    disabled={saving}
-                    className="text-white px-8 font-semibold"
-                    style={{ background: "#2874f0" }}
-                    data-ocid="seller.add_product.submit"
-                  >
-                    {saving
-                      ? "Saving..."
-                      : editId
-                        ? "Update Product"
-                        : "Add Product"}
-                  </Button>
-                  {editId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setEditId(null);
-                        setTab("products");
-                      }}
-                      className="border-gray-200"
+                <div className="flex gap-3 pt-2 flex-col">
+                  {saveError && (
+                    <div
+                      className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3"
+                      data-ocid="seller.add_product.error"
                     >
-                      Cancel
-                    </Button>
+                      <span className="font-semibold shrink-0">Error:</span>
+                      <span>{saveError}</span>
+                    </div>
                   )}
+                  {saveSuccess && (
+                    <div
+                      className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 font-medium"
+                      data-ocid="seller.add_product.success"
+                    >
+                      ✓ Product saved successfully!
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <Button
+                      type="submit"
+                      disabled={saving}
+                      className="text-white px-8 font-semibold"
+                      style={{ background: "#2874f0" }}
+                      data-ocid="seller.add_product.submit"
+                    >
+                      {saving
+                        ? "Saving..."
+                        : editId
+                          ? "Update Product"
+                          : "Add Product"}
+                    </Button>
+                    {editId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditId(null);
+                          setTab("products");
+                        }}
+                        className="border-gray-200"
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </form>
             </div>

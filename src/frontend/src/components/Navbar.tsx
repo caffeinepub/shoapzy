@@ -19,7 +19,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useActor } from "../hooks/useActor";
 import { useCompare } from "../hooks/useCompare";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { UserRole } from "../types";
 
 const CATEGORIES = [
   { label: "Electronics", path: "/?category=Electronics" },
@@ -51,9 +50,9 @@ export default function Navbar() {
     enabled: !!actor && !!identity,
   });
 
-  const { data: role } = useQuery({
-    queryKey: ["role", identity?.getPrincipal().toString()],
-    queryFn: () => actor!.getCallerUserRole(),
+  const { data: isAdminData } = useQuery({
+    queryKey: ["isAdmin", identity?.getPrincipal().toString()],
+    queryFn: () => actor!.isCallerAdmin(),
     enabled: !!actor && !!identity,
   });
 
@@ -66,7 +65,7 @@ export default function Navbar() {
   const cartCount =
     cart?.reduce((sum, item) => sum + Number(item.quantity), 0) ?? 0;
   const wishlistCount = wishlistIds.length;
-  const isAdmin = role === UserRole.admin;
+  const isAdmin = isAdminData === true;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
