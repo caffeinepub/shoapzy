@@ -304,6 +304,26 @@ actor {
     if (caller.isAnonymous()) {
       Runtime.trap("Please login to place an order");
     };
+    // Validate stock for every item before accepting the order
+    for (item in order.items.vals()) {
+      switch (products.get(item.productId)) {
+        case (null) { Runtime.trap("Product not found: " # item.productId) };
+        case (?product) {
+          if (product.stock < item.quantity) {
+            Runtime.trap("Insufficient stock for product: " # product.title);
+          };
+        };
+      };
+    };
+    // Deduct stock for each item
+    for (item in order.items.vals()) {
+      switch (products.get(item.productId)) {
+        case (null) {};
+        case (?product) {
+          products.add(item.productId, { product with stock = product.stock - item.quantity });
+        };
+      };
+    };
     orders.add(order.id, order);
     // Award loyalty points: 1 point per 10 rupees spent
     LoyaltyLib.awardPoints(loyaltyPoints, caller, order.totalAmount);
