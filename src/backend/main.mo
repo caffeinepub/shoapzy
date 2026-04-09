@@ -110,7 +110,17 @@ actor {
     commission : AdminCommissionBreakdown;
   };
 
+  // Stable backing storage so admin role survives canister upgrades
+  stable var _stableAdminAssigned : Bool = false;
+  stable var _stableUserRoles : [(Principal, AccessControl.UserRole)] = [];
+
   let accessControlState = AccessControl.initState();
+  // Restore persisted admin role on startup
+  accessControlState.adminAssigned := _stableAdminAssigned;
+  for ((p, r) in _stableUserRoles.vals()) {
+    accessControlState.userRoles.add(p, r);
+  };
+
   let approvalState = UserApproval.initState(accessControlState);
 
   // Kept for stable state upgrade compatibility with previous version
@@ -754,5 +764,17 @@ actor {
         reviewCount = cnt;
       }
     });
+  };
+
+  // ── Stable upgrade hooks ──────────────────────────────────────────────────
+  // Persist accessControlState so admin role is NEVER lost on canister upgrade
+
+  system func preupgrade() {
+    _stableAdminAssigned := accessControlState.adminAssigned;
+    _stableUserRoles := accessControlState.userRoles.entries().toArray();
+  };
+
+  system func postupgrade() {
+    // State is already restored in the let-block above on startup.
   };
 };

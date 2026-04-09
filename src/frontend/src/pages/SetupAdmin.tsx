@@ -32,10 +32,12 @@ export default function SetupAdmin() {
         });
         return await actor.getCallerUserRole();
       } catch {
+        // Not yet registered — treat as non-admin, allow claim attempt
         return null;
       }
     },
     enabled: !!identity,
+    retry: 1,
   });
 
   const principalId = identity?.getPrincipal().toString();

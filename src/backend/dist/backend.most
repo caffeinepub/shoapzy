@@ -116,6 +116,8 @@ type UserProfile__491224006 =
   };
 type UserRole__1054455867 = {#admin; #guest; #user};
 actor {
+  stable var _stableAdminAssigned : Bool;
+  stable var _stableUserRoles : [(Principal, UserRole__1054455867)];
   stable accessControlState :
     {
       var adminAssigned : Bool;

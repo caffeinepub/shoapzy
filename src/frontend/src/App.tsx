@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Footer from "./components/Footer";
@@ -40,12 +40,25 @@ function PageLoader() {
 function AppRoutes() {
   const { identity } = useInternetIdentity();
   const { actor } = useActor();
+  const queryClient = useQueryClient();
   const isLoggedIn = !!identity;
+  const principalId = identity?.getPrincipal().toString();
 
   const { data: isAdmin } = useQuery({
-    queryKey: ["isAdmin", identity?.getPrincipal().toString()],
-    queryFn: () => actor!.isCallerAdmin(),
+    queryKey: ["isAdmin", principalId],
+    queryFn: async () => {
+      // Invalidate stale cache for this exact key on each call
+      await queryClient.invalidateQueries({ queryKey: ["isAdmin"] });
+      try {
+        return await actor!.isCallerAdmin();
+      } catch {
+        // If caller is not registered yet, treat as non-admin (not undefined)
+        return false;
+      }
+    },
     enabled: !!actor && isLoggedIn,
+    staleTime: 0, // always re-fetch on mount so nav stays accurate
+    retry: 1,
   });
 
   return (

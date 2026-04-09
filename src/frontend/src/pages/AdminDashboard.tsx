@@ -1,6 +1,7 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
   BarChart3,
   CheckCircle,
   ChevronDown,
@@ -17,7 +18,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { CouponPublic } from "../backend";
 import { Button } from "../components/ui/button";
@@ -248,7 +249,12 @@ const TODAY_STR = new Date().toISOString().split("T")[0];
 function CouponsTab({
   actor,
   enabled,
-}: { actor: ReturnType<typeof useActor>["actor"]; enabled: boolean }) {
+  isActive,
+}: {
+  actor: ReturnType<typeof useActor>["actor"];
+  enabled: boolean;
+  isActive: boolean;
+}) {
   const queryClient = useQueryClient();
   const [formCode, setFormCode] = useState("");
   const [formDiscount, setFormDiscount] = useState("");
@@ -261,8 +267,16 @@ function CouponsTab({
   const { data: coupons = [], isLoading } = useQuery<CouponPublic[]>({
     queryKey: ["adminCoupons"],
     queryFn: () => actor!.listCoupons(),
-    enabled,
+    enabled: enabled && isActive,
+    refetchOnMount: "always",
   });
+
+  // Invalidate and refetch when this tab becomes active
+  useEffect(() => {
+    if (isActive && enabled) {
+      queryClient.invalidateQueries({ queryKey: ["adminCoupons"] });
+    }
+  }, [isActive, enabled, queryClient]);
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -604,34 +618,60 @@ export default function AdminDashboard() {
 
   const enabled = !!actor && !!identity;
 
+  // Invalidate tab-specific queries whenever the active tab changes
+  useEffect(() => {
+    if (!enabled) return;
+    if (tab === "sellers")
+      queryClient.invalidateQueries({ queryKey: ["pendingSellers"] });
+    if (tab === "allSellers")
+      queryClient.invalidateQueries({ queryKey: ["allSellers"] });
+    if (tab === "orders")
+      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
+    if (tab === "returns")
+      queryClient.invalidateQueries({ queryKey: ["allReturnRequests"] });
+    if (tab === "earnings") {
+      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["platformEarnings"] });
+    }
+  }, [tab, enabled, queryClient]);
+
   const { data: pendingSellers = [] } = useQuery({
     queryKey: ["pendingSellers"],
     queryFn: () => actor!.getPendingSellerDetails(),
     enabled,
+    refetchOnMount: "always",
   });
 
   const { data: allSellers = [], isLoading: allSellersLoading } = useQuery({
     queryKey: ["allSellers"],
     queryFn: () => actor!.getAllSellers(),
     enabled,
+    refetchOnMount: "always",
   });
 
   const { data: allOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["allOrders"],
     queryFn: () => actor!.getAllOrders(),
     enabled,
+    refetchOnMount: "always",
   });
 
   const { data: platformEarnings = BigInt(0) } = useQuery({
     queryKey: ["platformEarnings"],
     queryFn: () => actor!.getPlatformEarnings(),
     enabled,
+    refetchOnMount: "always",
   });
 
-  const { data: allReturnRequests = [], isLoading: returnsLoading } = useQuery({
+  const {
+    data: allReturnRequests = [],
+    isLoading: returnsLoading,
+    isError: returnsError,
+  } = useQuery({
     queryKey: ["allReturnRequests"],
     queryFn: () => actor!.getAllReturnRequests() as Promise<ReturnRequest[]>,
-    enabled,
+    enabled: enabled && tab === "returns",
+    refetchOnMount: "always",
   });
 
   const returnList = allReturnRequests as ReturnRequest[];
@@ -1091,6 +1131,31 @@ export default function AdminDashboard() {
                   <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-gray-300" />
                   Loading return requests...
                 </div>
+              ) : returnsError ? (
+                <div
+                  className="text-center py-16"
+                  data-ocid="returns.error_state"
+                >
+                  <AlertCircle className="w-12 h-12 text-red-200 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">
+                    Failed to load return requests
+                  </p>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Please refresh the page or try again
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() =>
+                      queryClient.invalidateQueries({
+                        queryKey: ["allReturnRequests"],
+                      })
+                    }
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry
+                  </Button>
+                </div>
               ) : returnList.length === 0 ? (
                 <div
                   className="text-center py-16"
@@ -1198,7 +1263,13 @@ export default function AdminDashboard() {
           )}
 
           {/* Coupons Tab */}
-          {tab === "coupons" && <CouponsTab actor={actor} enabled={enabled} />}
+          {tab === "coupons" && (
+            <CouponsTab
+              actor={actor}
+              enabled={enabled}
+              isActive={tab === "coupons"}
+            />
+          )}
 
           {/* Platform Earnings Tab */}
           {tab === "earnings" && (

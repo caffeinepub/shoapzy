@@ -52,8 +52,16 @@ export default function Navbar() {
 
   const { data: isAdminData } = useQuery({
     queryKey: ["isAdmin", identity?.getPrincipal().toString()],
-    queryFn: () => actor!.isCallerAdmin(),
+    queryFn: async () => {
+      try {
+        return await actor!.isCallerAdmin();
+      } catch {
+        return false;
+      }
+    },
     enabled: !!actor && !!identity,
+    staleTime: 0, // always re-check on mount — never show stale admin link
+    retry: 1,
   });
 
   const { data: wishlistIds = [] } = useQuery<string[]>({
